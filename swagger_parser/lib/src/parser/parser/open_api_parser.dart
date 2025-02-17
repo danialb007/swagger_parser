@@ -861,7 +861,6 @@ class OpenApiParser {
       }
 
       if (value.containsKey(_allOfConst)) {
-        print(key);
         for (final map in value[_allOfConst] as List<dynamic>) {
           if ((map as Map<String, dynamic>).containsKey(_refConst)) {
             final ref = _formatRef(map);
@@ -901,10 +900,16 @@ class OpenApiParser {
           value as Map<String, dynamic>;
           final discriminator =
               value[_discriminatorConst] as Map<String, dynamic>;
-          final mapping = discriminator[_mappingConst] as Map<String, dynamic>;
-          for (final element in mapping.entries) {
+          final propertyName = discriminator[_propertyNameConst] as String;
+          final refMapping =
+              discriminator[_mappingConst] as Map<String, dynamic>;
+          // Cleanup the refMapping to contain only the class name
+          final cleanedRefMapping = <String, String>{};
+          for (final element in refMapping.entries) {
+            final refMap = <String, dynamic>{_refConst: element.value};
+            cleanedRefMapping[element.key] = _formatRef(refMap);
             final typesWithImport = _findType(
-              {r'$ref': element.value},
+              refMap,
               name: element.key.toCamel,
               isRequired: false,
             );
@@ -916,10 +921,10 @@ class OpenApiParser {
           }
           parameters.add(
             UniversalType(
-              name: discriminator[_propertyNameConst] as String,
+              name: propertyName,
               type: 'string',
               isRequired: false,
-              jsonKey: discriminator[_propertyNameConst] as String,
+              jsonKey: propertyName,
             ),
           );
           dataClasses.add(
@@ -928,6 +933,12 @@ class OpenApiParser {
               imports: imports,
               parameters: parameters,
               description: value[_descriptionConst]?.toString(),
+              discriminator: (
+                propertyName: propertyName,
+                discriminatorValueToRefMapping: cleanedRefMapping,
+                // This property is populated by the parser after all the data classes are created
+                refProperties: <String, List<UniversalType>>{},
+              ),
             ),
           );
         },
