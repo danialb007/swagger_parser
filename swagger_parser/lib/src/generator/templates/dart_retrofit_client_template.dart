@@ -114,6 +114,10 @@ String _toParameter(UniversalRequestType parameter) {
   var parameterType = parameter.type.toSuitableType(ProgrammingLanguage.dart);
   // https://github.com/trevorwang/retrofit.dart/issues/631
   // https://github.com/Carapacik/swagger_parser/issues/110
+
+  final isEnum = parameter.type.type.contains('Enum');
+  final isDate = ['date-time', 'date', 'time'].contains(parameter.type.format);
+
   if (parameter.parameterType.isBody &&
       (parameterType == 'Object' || parameterType == 'Object?')) {
     parameterType = 'dynamic';
@@ -126,7 +130,7 @@ String _toParameter(UniversalRequestType parameter) {
 
   return "    @${parameter.parameterType.type}(${parameter.name != null && !parameter.parameterType.isBody ? "${parameter.parameterType.isPart ? 'name: ' : ''}'${parameter.name}'" : ''}) "
       '${_required(parameter.type)}'
-      '$parameterType '
+      '${isEnum || isDate ? 'String${parameter.type.nullable ? '?' : ''}' : parameterType} '
       '$keywordArguments${_defaultValue(parameter.type)},';
 }
 
@@ -161,7 +165,7 @@ String _hideHeaders(
 
 /// return required if isRequired
 String _required(UniversalType t) =>
-    t.isRequired && t.defaultValue == null ? 'required ' : '';
+    !t.nullable && t.defaultValue == null ? 'required ' : '';
 
 /// return defaultValue if have
 String _defaultValue(UniversalType t) => t.defaultValue != null

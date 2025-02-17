@@ -88,6 +88,13 @@
               }
             ],
             "default": "[]"
+          },
+          "nullableTypePrimitive": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": ""
           }
         }
       },

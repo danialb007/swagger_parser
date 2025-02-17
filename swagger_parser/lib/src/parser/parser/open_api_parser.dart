@@ -380,6 +380,24 @@ class OpenApiParser {
           for (final propName in properties.keys) {
             final propValue = properties[propName] as Map<String, dynamic>;
             final isRequired = requiredParameters.contains(propName);
+            final isNullable = switch (_apiInfo.schemaVersion) {
+              OAS.v3_1 when propValue[_typeConst] is List =>
+                (propValue[_typeConst] as List).cast<String>().contains('null'),
+              OAS.v3_1
+                  when propValue.containsKey(_allOfConst) ||
+                      propValue.containsKey(_anyOfConst) ||
+                      propValue.containsKey(_oneOfConst) =>
+                ((propValue[_allOfConst] ??
+                        propValue[_anyOfConst] ??
+                        propValue[_oneOfConst]) as List)
+                    .cast<Map<String, dynamic>>()
+                    .any(
+                      (element) =>
+                          element.keys.contains('type') &&
+                          element.values.contains('null'),
+                    ),
+              _ => propValue[_nullableConst] == true
+            };
             final typeWithImport = _findType(
               propValue,
               isRequired: isRequired,
@@ -400,7 +418,7 @@ class OpenApiParser {
                   format: currentType.format,
                   defaultValue: currentType.defaultValue,
                   isRequired: currentType.isRequired,
-                  nullable: currentType.nullable,
+                  nullable: isNullable,
                   wrappingCollections: currentType.wrappingCollections,
                 ),
               ),
@@ -776,6 +794,7 @@ class OpenApiParser {
       entities =
           _definitionFileContent[_definitionsConst] as Map<String, dynamic>;
     }
+    final oneOfSchemas = <Map<String, dynamic>>[];
     entities.forEach((key, value) {
       if (_skipDataClasses.contains(key)) {
         return;
@@ -842,6 +861,7 @@ class OpenApiParser {
       }
 
       if (value.containsKey(_allOfConst)) {
+        print(key);
         for (final map in value[_allOfConst] as List<dynamic>) {
           if ((map as Map<String, dynamic>).containsKey(_refConst)) {
             final ref = _formatRef(map);
@@ -853,6 +873,10 @@ class OpenApiParser {
             localFindParametersAndImports(map);
           }
         }
+      }
+
+      if (value.containsKey(_oneOfConst)) {
+        oneOfSchemas.add({key: value});
       }
 
       final allOf =
@@ -869,6 +893,46 @@ class OpenApiParser {
       );
     });
 
+    for (final element in oneOfSchemas) {
+      final parameters = <UniversalType>[];
+      final imports = SplayTreeSet<String>();
+      element.forEach(
+        (key, value) {
+          value as Map<String, dynamic>;
+          final discriminator =
+              value[_discriminatorConst] as Map<String, dynamic>;
+          final mapping = discriminator[_mappingConst] as Map<String, dynamic>;
+          for (final element in mapping.entries) {
+            final typesWithImport = _findType(
+              {r'$ref': element.value},
+              name: element.key.toCamel,
+              isRequired: false,
+            );
+
+            parameters.add(typesWithImport.type.copyWith(nullable: true));
+            if (typesWithImport.import != null) {
+              imports.add(typesWithImport.import!);
+            }
+          }
+          parameters.add(
+            UniversalType(
+              name: discriminator[_propertyNameConst] as String,
+              type: 'string',
+              isRequired: false,
+              jsonKey: discriminator[_propertyNameConst] as String,
+            ),
+          );
+          dataClasses.add(
+            UniversalComponentClass(
+              name: key,
+              imports: imports,
+              parameters: parameters,
+              description: value[_descriptionConst]?.toString(),
+            ),
+          );
+        },
+      );
+    }
     dataClasses.addAll(_objectClasses);
     _objectClasses.clear();
     dataClasses.addAll(_enumClasses);
@@ -965,8 +1029,7 @@ class OpenApiParser {
       final (newName, description) =
           protectName(name, description: map[_descriptionConst]?.toString());
 
-      final nullable =
-          map[_nullableConst].toString().toBool() ?? (root && !isRequired);
+      final nullable = map[_nullableConst].toString().toBool() ?? false;
 
       return (
         type: UniversalType(
@@ -1005,8 +1068,7 @@ class OpenApiParser {
       final (newName, description) =
           protectName(name, description: map[_descriptionConst]?.toString());
 
-      final nullable =
-          map[_nullableConst].toString().toBool() ?? (root && !isRequired);
+      final nullable = map[_nullableConst].toString().toBool() ?? false;
       return (
         type: UniversalType(
           type: type.type,
@@ -1136,8 +1198,7 @@ class OpenApiParser {
               : null,
           jsonKey: originalName,
           defaultValue: protectDefaultValue(map[_defaultConst]),
-          nullable:
-              map[_nullableConst].toString().toBool() ?? (root && !isRequired),
+          nullable: map[_nullableConst].toString().toBool() ?? false,
           isRequired: isRequired,
         ),
         import: type,
@@ -1308,11 +1369,10 @@ class OpenApiParser {
             isArray: (ofType?.wrappingCollections.length ?? 0) > 0,
           ),
           enumType: enumType,
-          isRequired: isRequired,
+          isRequired: ofType?.isRequired ?? isRequired,
           wrappingCollections: ofType?.wrappingCollections ?? [],
           nullable: ofType?.nullable ??
-              (map[_nullableConst].toString().toBool() ??
-                  (root && !isRequired)),
+              (map[_nullableConst].toString().toBool() ?? false),
         ),
         import: import,
       );
@@ -1360,8 +1420,7 @@ class OpenApiParser {
               protectDefaultValue(defaultValue, isEnum: enumType != null),
           enumType: enumType,
           isRequired: isRequired,
-          nullable:
-              map[_nullableConst].toString().toBool() ?? (root && !isRequired),
+          nullable: map[_nullableConst].toString().toBool() ?? false,
         ),
         import: import,
       );

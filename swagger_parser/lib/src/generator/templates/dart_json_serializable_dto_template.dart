@@ -16,20 +16,41 @@ String dartJsonSerializableDtoTemplate(
 ${generatedFileComment(
     markFileAsGenerated: markFileAsGenerated,
   )}${ioImport(dataClass)}import 'package:json_annotation/json_annotation.dart';
+import 'package:equatable/equatable.dart';
 ${dartImports(imports: dataClass.imports)}
 part '${dataClass.name.toSnake}.g.dart';
 
 ${descriptionComment(dataClass.description)}@JsonSerializable()
-class $className {
+class $className extends Equatable {
   const $className(${dataClass.parameters.isNotEmpty ? '{' : ''}${_parametersInConstructor(
     dataClass.parameters,
   )}${dataClass.parameters.isNotEmpty ? '\n  }' : ''});
   
-  factory $className.fromJson(Map<String, Object?> json) => _\$${className}FromJson(json);
+  factory $className.fromJson(Map<String, Object?> json) => ${fromJson(dataClass)};
+
   ${_parametersInClass(dataClass.parameters)}${dataClass.parameters.isNotEmpty ? '\n' : ''}
-  Map<String, Object?> toJson() => _\$${className}ToJson(this);
+  Map<String, Object?> toJson() => _\$${dataClass.name.toPascal}ToJson(this);
+
+  @override
+  List<Object?> get props => [${_parametersInProps(dataClass.parameters)}];
 }
 ''';
+}
+
+String fromJson(UniversalComponentClass dataClass) {
+  final propertyName = dataClass.discriminator?.propertyName;
+  final sortedByRequired = List<UniversalType>.from(
+    dataClass.parameters
+        .where((e) => e.name != propertyName)
+        .sorted((a, b) => a.compareTo(b)),
+  );
+  if (dataClass.discriminator != null) {
+    return '${dataClass.name.toPascal}'
+        '(${sortedByRequired.map((e) => '\n      ${e.name}: (json["$propertyName"] as String).toLowerCase() != "${e.name?.toLowerCase()}" ? null: ${e.copyWith(isRequired: false).toSuitableType(ProgrammingLanguage.dart)}.fromJson(json),').join()}'
+        '\n      $propertyName: json["$propertyName"] as String'
+        '\n    )';
+  }
+  return '_\$${dataClass.name.toPascal}FromJson(json)';
 }
 
 String _parametersInClass(List<UniversalType> parameters) => parameters
@@ -48,6 +69,12 @@ String _parametersInConstructor(List<UniversalType> parameters) {
       .join();
 }
 
+String _parametersInProps(List<UniversalType> parameters) {
+  final sortedByRequired =
+      List<UniversalType>.from(parameters.sorted((a, b) => a.compareTo(b)));
+  return sortedByRequired.map((e) => '${e.name}').join(', ');
+}
+
 /// if jsonKey is different from the name
 String _jsonKey(UniversalType t) {
   if (t.jsonKey == null || t.name == t.jsonKey) {
@@ -58,7 +85,7 @@ String _jsonKey(UniversalType t) {
 
 /// return required if isRequired
 String _required(UniversalType t) =>
-    t.isRequired && t.defaultValue == null ? 'required ' : '';
+    !t.nullable && t.defaultValue == null ? 'required ' : '';
 
 /// return defaultValue if have
 String _defaultValue(UniversalType t) => t.defaultValue != null

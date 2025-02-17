@@ -1,0 +1,4 @@
+# melos_managed_dependency_overrides: swagger_parser
+dependency_overrides:
+  swagger_parser:
+    path: ..
