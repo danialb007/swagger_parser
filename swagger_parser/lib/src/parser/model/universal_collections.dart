@@ -22,7 +22,7 @@ enum UniversalCollections {
           'List<',
         UniversalCollections.map ||
         UniversalCollections.nullableMap =>
-          'Map<String, '
+          'Map<String, ',
       };
 
   /// Returns question mark for collection
@@ -30,6 +30,6 @@ enum UniversalCollections {
         UniversalCollections.nullableList ||
         UniversalCollections.nullableMap =>
           '?',
-        UniversalCollections.list || UniversalCollections.map => ''
+        UniversalCollections.list || UniversalCollections.map => '',
       };
 }

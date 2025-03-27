@@ -26,7 +26,9 @@ enum ProgrammingLanguage {
   const ProgrammingLanguage(this.fileExtension);
 
   /// Returns [ProgrammingLanguage] from string
-  factory ProgrammingLanguage.fromString(String value) =>
+  factory ProgrammingLanguage.fromString(
+    String value,
+  ) =>
       ProgrammingLanguage.values.firstWhere(
         (e) => e.name == value,
         orElse: () => throw ArgumentError(
@@ -76,7 +78,7 @@ enum ProgrammingLanguage {
             JsonSerializer.dartMappable => dartDartMappableDtoTemplate(
                 dataClass,
                 markFileAsGenerated: markFilesAsGenerated,
-              )
+              ),
           };
         }
       case kotlin:

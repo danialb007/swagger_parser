@@ -6,10 +6,7 @@ import '../utils/case_utils.dart';
 @immutable
 final class ReplacementRule {
   /// Constructor for [ReplacementRule]
-  const ReplacementRule({
-    required this.pattern,
-    required this.replacement,
-  });
+  const ReplacementRule({required this.pattern, required this.replacement});
 
   /// Pattern to match
   final RegExp pattern;

@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
+import '../utils/case_utils.dart';
 import '../utils/type_utils.dart';
 import 'universal_type.dart';
 
@@ -11,10 +12,7 @@ part 'universal_enum_class.dart';
 @immutable
 sealed class UniversalDataClass {
   /// Constructor for [UniversalDataClass]
-  const UniversalDataClass({
-    required this.name,
-    this.description,
-  });
+  const UniversalDataClass({required this.name, this.description});
 
   /// Name of the class
   final String name;

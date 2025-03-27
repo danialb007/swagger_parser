@@ -43,7 +43,7 @@ class Generator {
         totalRestClients: restClients.length,
         totalRequests: restClients.fold(0, (v, e) => v + e.requests.length),
         timeElapsed: stopwatch.elapsed,
-      )
+      ),
     );
   }
 
@@ -90,10 +90,7 @@ class Generator {
     totalFiles += files.length;
     for (final file in files) {
       totalLines += RegExp('\n').allMatches(file.content).length;
-      await generateFile(
-        config.outputDirectory,
-        file,
-      );
+      await generateFile(config.outputDirectory, file);
     }
     return (totalFiles, totalLines);
   }

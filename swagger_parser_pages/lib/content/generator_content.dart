@@ -90,8 +90,7 @@ class _GeneratorContentState extends State<GeneratorContent> {
                                 height: 48,
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFc92b16)
-                                        .withValues(alpha: 0.8),
+                                    backgroundColor: const Color(0xb3c92b16),
                                   ),
                                   onPressed: () async {
                                     _fileContent.clear();
@@ -142,9 +141,8 @@ class _GeneratorContentState extends State<GeneratorContent> {
                         width: 300,
                         initialSelection: ProgrammingLanguage.dart,
                         dropdownMenuEntries: ProgrammingLanguage.values
-                            .map(
-                              (e) => DropdownMenuEntry(value: e, label: e.name),
-                            )
+                            .map((e) =>
+                                DropdownMenuEntry(value: e, label: e.name))
                             .toList(growable: false),
                         onSelected: (lng) => setState(() => _language = lng!),
                       ),
@@ -328,8 +326,9 @@ class _GeneratorContentState extends State<GeneratorContent> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        title:
-                            const Text(r'Generate $unknown element in enums'),
+                        title: const Text(
+                          r'Generate $unknown element in enums',
+                        ),
                         value: _unknownEnumValue,
                         onChanged: (value) =>
                             setState(() => _unknownEnumValue = value!),
@@ -386,8 +385,12 @@ Future<void> _generateOutputs(
   final sm = ScaffoldMessenger.of(context);
   final generator = GenProcessor(config);
   try {
-    final files = await generator
-        .generateContent((fileContent: fileContent, isJson: isJson));
+    final files = await generator.generateContent(
+      (
+        fileContent: fileContent,
+        isJson: isJson,
+      ),
+    );
     generateArchive(files);
   } on Object catch (e, st) {
     sm.showSnackBar(

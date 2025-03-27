@@ -23,8 +23,16 @@ extension StringTypeX on String {
         // https://github.com/trevorwang/retrofit.dart/issues/631
         // https://github.com/Carapacik/swagger_parser/issues/110
         'object' || 'null' => 'dynamic',
-        _ => this
+        _ => startsWith('[') ? _parseTypeList(this) : this,
       };
+
+  String _parseTypeList(String types) {
+    final typesList = types.replaceAll(RegExp(r'[\[\] ]'), '').split(',');
+    if (typesList.length == 2 && typesList.contains('null')) {
+      return typesList.firstWhere((e) => e != 'null').toDartType();
+    }
+    return 'dynamic';
+  }
 
   /// Convert string to kotlin type
   String toKotlinType([String? format]) => switch (this) {
@@ -43,7 +51,7 @@ extension StringTypeX on String {
         'file' => 'MultipartBody.Part',
         'boolean' => 'Boolean',
         'object' => 'Any',
-        _ => this
+        _ => this,
       };
 }
 
@@ -149,17 +157,14 @@ Set<UniversalEnumItem> protectEnumItemsNames(Iterable<String> names) {
       _
           when _startWithNumberRegExp.hasMatch(name) &&
               _enumNameRegExp.hasMatch(numberEnumItemName(name).toCamel) =>
-        (
-          numberEnumItemName(name),
-          null,
-        ),
+        (numberEnumItemName(name), null),
       _ when !_enumNameRegExp.hasMatch(name) => (
           uniqueEnumItemName(),
-          'Incorrect name has been replaced. Original name: `$name`.'
+          'Incorrect name has been replaced. Original name: `$name`.',
         ),
       _ when dartEnumMemberKeywords.contains(name.toCamel) => (
           '$_valueConst ${leadingDashToMinus(name)}',
-          'The name has been replaced because it contains a keyword. Original name: `$name`.'
+          'The name has been replaced because it contains a keyword. Original name: `$name`.',
         ),
       _ => (leadingDashToMinus(name), null),
     };
@@ -170,6 +175,22 @@ Set<UniversalEnumItem> protectEnumItemsNames(Iterable<String> names) {
         description: renameDescription,
       ),
     );
+  }
+
+  return items;
+}
+
+/// Protect enum items names from incorrect symbols, keywords, etc.
+Set<UniversalEnumItem> protectEnumItemsNamesAndValues(
+  Iterable<String> names,
+  Iterable<String> values,
+) {
+  final items = <UniversalEnumItem>{};
+  final nameList = names.toList();
+  final valueList = values.toList();
+
+  for (var i = 0; i < nameList.length; i++) {
+    items.add(UniversalEnumItem(name: nameList[i], jsonKey: valueList[i]));
   }
 
   return items;
@@ -189,16 +210,16 @@ final _nameRegExp = RegExp(r'^[a-zA-Z_-][a-zA-Z\d_-]*$');
     null || '' => uniqueIfNull
         ? (
             uniqueName(isEnum: isEnum),
-            'Name not received and was auto-generated.'
+            'Name not received and was auto-generated.',
           )
         : (null, null),
     _ when !_nameRegExp.hasMatch(name) => (
         uniqueName(isEnum: isEnum),
-        'Incorrect name has been replaced. Original name: `$name`.'
+        'Incorrect name has been replaced. Original name: `$name`.',
       ),
     _ when dartKeywords.contains(name.toCamel) => (
         '$name ${isEnum ? _enumConst : _valueConst}',
-        'The name has been replaced because it contains a keyword. Original name: `$name`.'
+        'The name has been replaced because it contains a keyword. Original name: `$name`.',
       ),
     _ => (name, null),
   };

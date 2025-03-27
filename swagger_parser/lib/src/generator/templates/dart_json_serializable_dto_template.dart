@@ -22,9 +22,7 @@ part '${dataClass.name.toSnake}.g.dart';
 
 ${descriptionComment(dataClass.description)}@JsonSerializable()
 class $className extends Equatable {
-  const $className(${dataClass.parameters.isNotEmpty ? '{' : ''}${_parametersInConstructor(
-    dataClass.parameters,
-  )}${dataClass.parameters.isNotEmpty ? '\n  }' : ''});
+  const $className(${dataClass.parameters.isNotEmpty ? '{' : ''}${_parametersInConstructor(dataClass.parameters)}${dataClass.parameters.isNotEmpty ? '\n  }' : ''});
   
   factory $className.fromJson(Map<String, Object?> json) => ${fromJson(dataClass)};
 
@@ -62,8 +60,9 @@ String _parametersInClass(List<UniversalType> parameters) => parameters
     .join();
 
 String _parametersInConstructor(List<UniversalType> parameters) {
-  final sortedByRequired =
-      List<UniversalType>.from(parameters.sorted((a, b) => a.compareTo(b)));
+  final sortedByRequired = List<UniversalType>.from(
+    parameters.sorted((a, b) => a.compareTo(b)),
+  );
   return sortedByRequired
       .map((e) => '\n    ${_required(e)}this.${e.name}${_defaultValue(e)},')
       .join();
@@ -91,8 +90,5 @@ String _required(UniversalType t) =>
 String _defaultValue(UniversalType t) => t.defaultValue != null
     ? ' = '
         '${t.wrappingCollections.isNotEmpty ? 'const ' : ''}'
-        '${t.enumType != null ? '${t.type}.${protectDefaultEnum(t.defaultValue)?.toCamel}' : protectDefaultValue(
-            t.defaultValue,
-            type: t.type,
-          )}'
+        '${t.enumType != null ? '${t.type}.${protectDefaultEnum(t.defaultValue)?.toCamel}' : protectDefaultValue(t.defaultValue, type: t.type)}'
     : '';

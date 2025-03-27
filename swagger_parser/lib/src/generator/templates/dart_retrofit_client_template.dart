@@ -16,11 +16,8 @@ String dartRetrofitClientTemplate({
   bool dioOptionsParameterByDefault = false,
   bool originalHttpResponse = false,
 }) {
-  final sb = StringBuffer(
-    '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${_convertImport(restClient)}${_fileImport(
-      restClient,
-    )}import 'package:dio/dio.dart'${_hideHeaders(restClient, defaultContentType)};
+  final sb = StringBuffer('''
+${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${_convertImport(restClient)}${_fileImport(restClient)}import 'package:dio/dio.dart'${_hideHeaders(restClient, defaultContentType)};
 import 'package:retrofit/retrofit.dart';
 ${dartImports(imports: restClient.imports, pathPrefix: '../models/')}
 part '${name.toSnake}.g.dart';
@@ -28,8 +25,7 @@ part '${name.toSnake}.g.dart';
 @RestApi()
 abstract class $name {
   factory $name(Dio dio, {String? baseUrl}) = _$name;
-''',
-  );
+''');
   for (final request in restClient.requests) {
     sb.write(
       _toClientRequest(
@@ -90,9 +86,7 @@ String _toClientRequest(
 
 String _convertImport(UniversalRestClient restClient) =>
     restClient.requests.any(
-      (r) => r.parameters.any(
-        (e) => e.parameterType.isPart,
-      ),
+      (r) => r.parameters.any((e) => e.parameterType.isPart),
     )
         ? "import 'dart:convert';\n"
         : '';
@@ -125,8 +119,10 @@ String _toParameter(UniversalRequestType parameter) {
 
   // https://github.com/trevorwang/retrofit.dart/issues/661
   // The Word `value` cant be used a a keyword argument
-  final keywordArguments =
-      parameter.type.name!.toCamel.replaceFirst('value', 'value_');
+  final keywordArguments = parameter.type.name!.toCamel.replaceFirst(
+    'value',
+    'value_',
+  );
 
   return "    @${parameter.parameterType.type}(${parameter.name != null && !parameter.parameterType.isBody ? "${parameter.parameterType.isPart ? 'name: ' : ''}'${parameter.name}'" : ''}) "
       '${_required(parameter.type)}'
@@ -134,10 +130,7 @@ String _toParameter(UniversalRequestType parameter) {
       '$keywordArguments${_defaultValue(parameter.type)},';
 }
 
-String _contentTypeHeader(
-  UniversalRequest request,
-  String defaultContentType,
-) {
+String _contentTypeHeader(UniversalRequest request, String defaultContentType) {
   if (request.isMultiPart) {
     return '@MultiPart()\n  ';
   }

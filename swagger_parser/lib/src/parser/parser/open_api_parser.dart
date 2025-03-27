@@ -56,6 +56,7 @@ class OpenApiParser {
   static const _deprecatedConst = 'deprecated';
   static const _discriminatorConst = 'discriminator';
   static const _enumConst = 'enum';
+  static const _enumNamesConst = 'x-enumNames';
   static const _formatConst = 'format';
   static const _formUrlEncodedConst = 'application/x-www-form-urlencoded';
   static const _inConst = 'in';
@@ -340,8 +341,9 @@ class OpenApiParser {
           final Map<String, dynamic> properties;
           final List<String> requiredParameters;
 
-          if ((contentType[_schemaConst] as Map<String, dynamic>)
-              .containsKey(_refConst)) {
+          if ((contentType[_schemaConst] as Map<String, dynamic>).containsKey(
+            _refConst,
+          )) {
             final isRequired =
                 requestBody[_requiredConst]?.toString().toBool() ?? false;
             final typeWithImport = _findType(
@@ -553,9 +555,7 @@ class OpenApiParser {
         );
         if (parameterType == null) {
           // ignore: avoid_print
-          print(
-            'Warning:\nparameterType ${parameter[_inConst]} not supported',
-          );
+          print('Warning:\nparameterType ${parameter[_inConst]} not supported');
         } else {
           types.add(
             UniversalRequestType(
@@ -575,8 +575,10 @@ class OpenApiParser {
     if (!_definitionFileContent.containsKey(_pathsConst)) {
       return [];
     }
-    (_definitionFileContent[_pathsConst] as Map<String, dynamic>)
-        .forEach((path, pathValue) {
+    (_definitionFileContent[_pathsConst] as Map<String, dynamic>).forEach((
+      path,
+      pathValue,
+    ) {
       final pathValueMap = pathValue as Map<String, dynamic>;
 
       // global parameters are defined at the path level (i.e. /users/{id})
@@ -666,8 +668,9 @@ class OpenApiParser {
               requestPath[_deprecatedConst].toString().toBool() ?? false,
         );
         final currentTag = _getTag(requestPath);
-        final sameTagIndex =
-            restClients.indexWhere((e) => e.name == currentTag);
+        final sameTagIndex = restClients.indexWhere(
+          (e) => e.name == currentTag,
+        );
         if (sameTagIndex == -1) {
           restClients.add(
             UniversalRestClient(
@@ -819,9 +822,14 @@ class OpenApiParser {
       if (value.containsKey(_propertiesConst)) {
         localFindParametersAndImports(value);
       } else if (value.containsKey(_enumConst)) {
-        final items = protectEnumItemsNames(
-          (value[_enumConst] as List).map((e) => '$e'),
-        );
+        final Set<UniversalEnumItem> items;
+        final values = (value[_enumConst] as List).map((e) => '$e');
+        if (value.containsKey(_enumNamesConst)) {
+          final names = (value[_enumNamesConst] as List).map((e) => '$e');
+          items = protectEnumItemsNamesAndValues(names, values);
+        } else {
+          items = protectEnumItemsNames(values);
+        }
         final type = value[_typeConst].toString();
 
         dataClasses.add(
@@ -855,9 +863,7 @@ class OpenApiParser {
             description: value[_descriptionConst]?.toString(),
           ),
         );
-        if (!value.containsKey(_allOfConst)) {
-          return;
-        }
+        return;
       }
 
       if (value.containsKey(_allOfConst)) {
@@ -881,6 +887,7 @@ class OpenApiParser {
       final allOf =
           refs.isNotEmpty ? (refs: refs, properties: parameters) : null;
 
+      final discriminator = _parseDiscriminatorInfo(value);
       dataClasses.add(
         UniversalComponentClass(
           name: key,
@@ -888,6 +895,7 @@ class OpenApiParser {
           parameters: allOf != null ? [] : parameters,
           allOf: allOf,
           description: value[_descriptionConst]?.toString(),
+          discriminator: discriminator,
         ),
       );
     });
@@ -950,8 +958,9 @@ class OpenApiParser {
     _enumClasses.clear();
 
     // check for `allOf`
-    final allOfClasses = dataClasses
-        .where((dc) => dc is UniversalComponentClass && dc.allOf != null);
+    final allOfClasses = dataClasses.where(
+      (dc) => dc is UniversalComponentClass && dc.allOf != null,
+    );
     for (final allOfClass in allOfClasses) {
       if (allOfClass is! UniversalComponentClass) {
         continue;
@@ -987,12 +996,28 @@ class OpenApiParser {
       final discriminator = discriminatedOneOfClass.discriminator!;
       // for each ref, we lookup the matching dataclass and add its properties to the discriminator mapping, its imports are added to the discriminatedOneOfClass's imports
       for (final ref in discriminator.discriminatorValueToRefMapping.values) {
-        final refedClass = dataClasses.firstWhere((dc) => dc.name == ref);
+        final refedClassIndex = dataClasses.indexWhere((dc) => dc.name == ref);
+        final refedClass = dataClasses[refedClassIndex];
         if (refedClass is! UniversalComponentClass) {
           continue;
         }
         discriminator.refProperties[ref] = refedClass.parameters;
         discriminatedOneOfClass.imports.addAll(refedClass.imports);
+        discriminatedOneOfClass.imports.add(refedClass.import);
+
+        dataClasses[refedClassIndex] = refedClass.copyWith(
+          imports: {
+            ...refedClass.imports,
+            discriminatedOneOfClass.import,
+          }.sortedBy((it) => it).toSet(),
+          discriminatorValue: (
+            propertyValue: discriminatedOneOfClass
+                .discriminator!.discriminatorValueToRefMapping.entries
+                .firstWhere((it) => it.value == ref)
+                .key,
+            parentClass: discriminatedOneOfClass.name,
+          ),
+        );
       }
     }
 
@@ -1037,8 +1062,10 @@ class OpenApiParser {
         isRequired: isRequired,
       );
 
-      final (newName, description) =
-          protectName(name, description: map[_descriptionConst]?.toString());
+      final (newName, description) = protectName(
+        name,
+        description: map[_descriptionConst]?.toString(),
+      );
 
       final nullable = map[_nullableConst].toString().toBool() ?? false;
 
@@ -1076,8 +1103,10 @@ class OpenApiParser {
         isRequired: isRequired,
       );
 
-      final (newName, description) =
-          protectName(name, description: map[_descriptionConst]?.toString());
+      final (newName, description) = protectName(
+        name,
+        description: map[_descriptionConst]?.toString(),
+      );
 
       final nullable = map[_nullableConst].toString().toBool() ?? false;
       return (
@@ -1120,9 +1149,14 @@ class OpenApiParser {
         newName = replacementRule.apply(newName)!;
       }
 
-      final items = protectEnumItemsNames(
-        (map[_enumConst] as List).map((e) => '$e'),
-      );
+      final Set<UniversalEnumItem> items;
+      final values = (map[_enumConst] as List).map((e) => '$e');
+      if (map.containsKey(_enumNamesConst)) {
+        final names = (map[_enumNamesConst] as List).map((e) => '$e');
+        items = protectEnumItemsNamesAndValues(names, values);
+      } else {
+        items = protectEnumItemsNames(values);
+      }
 
       final enumClass = _getUniqueEnumClass(
         name: newName,
@@ -1170,9 +1204,7 @@ class OpenApiParser {
         description: map[_descriptionConst]?.toString(),
       );
 
-      final (parameters, imports) = _findParametersAndImports(
-        map,
-      );
+      final (parameters, imports) = _findParametersAndImports(map);
 
       var type = newName.toPascal;
 
@@ -1223,13 +1255,13 @@ class OpenApiParser {
       // Handle discriminated oneOf
       if (map.containsKey(_oneOfConst) &&
           map.containsKey(_discriminatorConst) &&
-          (map[_discriminatorConst] as Map<String, dynamic>)
-              .containsKey(_propertyNameConst) &&
-          (map[_discriminatorConst] as Map<String, dynamic>)
-              .containsKey(_mappingConst)) {
-        final discriminator = map[_discriminatorConst] as Map<String, dynamic>;
-        final propertyName = discriminator[_propertyNameConst] as String;
-        final refMapping = discriminator[_mappingConst] as Map<String, dynamic>;
+          (map[_discriminatorConst] as Map<String, dynamic>).containsKey(
+            _propertyNameConst,
+          ) &&
+          (map[_discriminatorConst] as Map<String, dynamic>).containsKey(
+            _mappingConst,
+          )) {
+        final discriminator = _parseDiscriminatorInfo(map);
 
         // Create a base union class for the discriminated types
         final baseClassName =
@@ -1240,13 +1272,6 @@ class OpenApiParser {
           description: map[_descriptionConst]?.toString(),
         );
 
-        // Cleanup the refMapping to contain only the class name
-        final cleanedRefMapping = <String, String>{};
-        for (final key in refMapping.keys) {
-          final refMap = <String, dynamic>{_refConst: refMapping[key]};
-          cleanedRefMapping[key] = _formatRef(refMap);
-        }
-
         // Create a sealed class to represent the discriminated union
         _objectClasses.add(
           UniversalComponentClass(
@@ -1255,16 +1280,11 @@ class OpenApiParser {
             parameters: [
               UniversalType(
                 type: 'String',
-                name: propertyName,
+                name: discriminator?.propertyName,
                 isRequired: true,
               ),
             ],
-            discriminator: (
-              propertyName: propertyName,
-              discriminatorValueToRefMapping: cleanedRefMapping,
-              // This property is populated by the parser after all the data classes are created
-              refProperties: <String, List<UniversalType>>{},
-            ),
+            discriminator: discriminator,
           ),
         );
 
@@ -1345,8 +1365,9 @@ class OpenApiParser {
                       UniversalCollections.nullableMap,
                     _ => first,
                   };
-                ofType =
-                    type.copyWith(wrappingCollections: wrappingCollections);
+                ofType = type.copyWith(
+                  wrappingCollections: wrappingCollections,
+                );
               }
             }
           }
@@ -1364,8 +1385,10 @@ class OpenApiParser {
               (ofType == null || ofType.wrappingCollections.isEmpty)
           ? type
           : null;
-      final (newName, description) =
-          protectName(name, description: map[_descriptionConst]?.toString());
+      final (newName, description) = protectName(
+        name,
+        description: map[_descriptionConst]?.toString(),
+      );
 
       return (
         type: UniversalType(
@@ -1396,11 +1419,12 @@ class OpenApiParser {
         import = _formatRef(map).toPascal;
       } else if (map.containsKey(_additionalPropertiesConst) &&
           map[_additionalPropertiesConst] is Map<String, dynamic> &&
-          (map[_additionalPropertiesConst] as Map<String, dynamic>)
-              .containsKey(_refConst)) {
-        import =
-            _formatRef(map[_additionalPropertiesConst] as Map<String, dynamic>)
-                .toPascal;
+          (map[_additionalPropertiesConst] as Map<String, dynamic>).containsKey(
+            _refConst,
+          )) {
+        import = _formatRef(
+          map[_additionalPropertiesConst] as Map<String, dynamic>,
+        ).toPascal;
       }
 
       if (map.containsKey(_typeConst)) {
@@ -1415,8 +1439,10 @@ class OpenApiParser {
       }
 
       final defaultValue = map[_defaultConst]?.toString();
-      final (newName, description) =
-          protectName(name, description: map[_descriptionConst]?.toString());
+      final (newName, description) = protectName(
+        name,
+        description: map[_descriptionConst]?.toString(),
+      );
 
       final enumType = defaultValue != null && import != null ? type : null;
 
@@ -1427,8 +1453,10 @@ class OpenApiParser {
           description: description,
           format: map[_formatConst]?.toString(),
           jsonKey: name,
-          defaultValue:
-              protectDefaultValue(defaultValue, isEnum: enumType != null),
+          defaultValue: protectDefaultValue(
+            defaultValue,
+            isEnum: enumType != null,
+          ),
           enumType: enumType,
           isRequired: isRequired,
           nullable: map[_nullableConst].toString().toBool() ?? false,
@@ -1436,6 +1464,28 @@ class OpenApiParser {
         import: import,
       );
     }
+  }
+
+  Discriminator? _parseDiscriminatorInfo(Map<String, dynamic> map) {
+    if (!map.containsKey(_oneOfConst)) {
+      return null;
+    }
+    final discriminator = map[_discriminatorConst] as Map<String, dynamic>;
+    final propertyName = discriminator[_propertyNameConst] as String;
+    final refMapping = discriminator[_mappingConst] as Map<String, dynamic>;
+
+    // Cleanup the refMapping to contain only the class name
+    final cleanedRefMapping = <String, String>{};
+    for (final key in refMapping.keys) {
+      final refMap = <String, dynamic>{_refConst: refMapping[key]};
+      cleanedRefMapping[key] = _formatRef(refMap);
+    }
+    return (
+      propertyName: propertyName,
+      discriminatorValueToRefMapping: cleanedRefMapping,
+      // This property is populated by the parser after all the data classes are created
+      refProperties: <String, List<UniversalType>>{},
+    );
   }
 }
 

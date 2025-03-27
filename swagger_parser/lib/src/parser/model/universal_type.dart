@@ -139,8 +139,10 @@ final class UniversalType {
           defaultValue == other.defaultValue &&
           isRequired == other.isRequired &&
           enumType == other.enumType &&
-          const DeepCollectionEquality()
-              .equals(wrappingCollections, other.wrappingCollections) &&
+          const DeepCollectionEquality().equals(
+            wrappingCollections,
+            other.wrappingCollections,
+          ) &&
           nullable == other.nullable &&
           min == other.min &&
           max == other.max &&
