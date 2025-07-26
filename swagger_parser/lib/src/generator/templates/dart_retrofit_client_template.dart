@@ -122,6 +122,10 @@ String _toParameter(UniversalRequestType parameter, bool useMultipartFile) {
     ProgrammingLanguage.dart,
     useMultipartFile: useMultipartFile,
   );
+
+  final isEnum = parameter.type.type.contains('Enum');
+  final isDate = ['date-time', 'date', 'time'].contains(parameter.type.format);
+
   // https://github.com/trevorwang/retrofit.dart/issues/631
   // https://github.com/Carapacik/swagger_parser/issues/110
   if (parameter.parameterType.isBody &&
@@ -139,7 +143,7 @@ String _toParameter(UniversalRequestType parameter, bool useMultipartFile) {
   return '    @${parameter.parameterType.type}'
       "(${parameter.name != null && !parameter.parameterType.isBody ? "${parameter.parameterType.isPart ? 'name: ' : ''}${_startWith$(parameter.name!) ? 'r' : ''}'${parameter.name}'" : ''}) "
       '${_required(parameter.type)}'
-      '$parameterType '
+      '${isEnum || isDate ? 'String${parameter.type.nullable ? '?' : ''}' : parameterType} '
       '$keywordArguments${_defaultValue(parameter.type)},';
 }
 
@@ -170,7 +174,7 @@ String _hideHeaders(
         : '';
 
 /// return required if isRequired
-String _required(UniversalType t) => t.isRequired ? 'required ' : '';
+String _required(UniversalType t) => !t.nullable ? 'required ' : '';
 
 /// return defaultValue if have and not required
 String _defaultValue(UniversalType t) => !t.isRequired && t.defaultValue != null

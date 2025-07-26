@@ -394,7 +394,8 @@ class OpenApiParser {
                   type: currentType.type,
                   name: propName,
                   description: currentType.description,
-                  format: currentType.format,
+                  format:
+                      currentType.format ?? propValue[_formatConst] as String?,
                   defaultValue: currentType.defaultValue,
                   isRequired: currentType.isRequired,
                   nullable: currentType.nullable,
@@ -1026,7 +1027,7 @@ class OpenApiParser {
 
       // Nullability of the array itself.
       final isCollectionItselfNullable =
-          map[_nullableConst].toString().toBool() ?? (root && !isRequired);
+          map[_nullableConst].toString().toBool() ?? false;
 
       // Nullability of the items within the array.
       final areItemsNullable = itemDetails.nullable;
@@ -1092,7 +1093,7 @@ class OpenApiParser {
 
       // Nullability of the map itself.
       final isMapItselfNullable =
-          map[_nullableConst].toString().toBool() ?? (root && !isRequired);
+          map[_nullableConst].toString().toBool() ?? false;
 
       // Nullability of the values within the map.
       final areValuesNullable = valueDetails.nullable;
@@ -1259,8 +1260,7 @@ class OpenApiParser {
               : null,
           jsonKey: originalName,
           defaultValue: protectDefaultValue(map[_defaultConst]),
-          nullable:
-              map[_nullableConst].toString().toBool() ?? (root && !isRequired),
+          nullable: map[_nullableConst].toString().toBool() ?? false,
           isRequired: isRequired,
         ),
         import: type,
@@ -1539,6 +1539,7 @@ class OpenApiParser {
             enumType: enumType,
             description: protectedDescription,
             jsonKey: name, // Preserve original name for jsonKey
+            format: map[_formatConst] as String?, // Preserve original format
           );
         }
       }
@@ -1631,8 +1632,7 @@ class OpenApiParser {
           ),
           enumType: enumType,
           isRequired: isRequired,
-          nullable:
-              map[_nullableConst].toString().toBool() ?? (root && !isRequired),
+          nullable: map[_nullableConst].toString().toBool() ?? false,
         ),
         import: import,
       );

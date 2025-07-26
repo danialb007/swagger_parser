@@ -71,7 +71,8 @@ String _dartEnumDartMappableTemplate(
       .join(',\n');
 
   final annotationParameters = [
-    if (unknownEnumValue) "defaultValue: 'unknown'",
+    if (unknownEnumValue)
+      "defaultValue: ${enumClass.type == 'integer' ? -10 : '"unknown"'}",
   ].join(', ');
 
   final enumBodyParts = [
@@ -166,7 +167,7 @@ String _enumValueDartMappable(
 }) {
   final protectedJsonKey = protectJsonKey(item.jsonKey);
   return '''
-${index != 0 ? '\n' : ''}${descriptionComment(item.description, tab: '  ')}${indentation(2)}@MappableValue(${type == 'string' ? "'$protectedJsonKey'" : protectedJsonKey}) 
+${index != 0 ? '\n' : ''}${descriptionComment(item.description, tab: '  ')}${indentation(2)}@MappableValue(${type == 'string' ? "'$protectedJsonKey'" : type == 'integer' && protectedJsonKey == 'unknown' ? -10 : protectedJsonKey}) 
 ${indentation(2)}${item.name.toCamel}''';
 }
 
