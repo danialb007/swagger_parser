@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../../utils/type_utils.dart';
 import '../model/json_serializer.dart';
@@ -18,7 +18,6 @@ String dartDartMappableDtoTemplate(
   final parent = dataClass.discriminatorValue?.parentClass;
 
   return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}
 ${dartImportDtoTemplate(JsonSerializer.dartMappable)}
 ${dartImports(imports: dataClass.imports)}
 part '${dataClass.name.toSnake}.mapper.dart';

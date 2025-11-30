@@ -1,6 +1,6 @@
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint, unused_import
+// ignore_for_file: type=lint, unused_import, invalid_annotation_target, unnecessary_import
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -36,7 +36,7 @@ enum EnumClassDynamic {
   @JsonValue('3item_three')
   value3itemThree('3item_three'),
   @JsonValue('4ITEM-FOUR')
-  value4ItemFour('4ITEM-FOUR'),
+  value4itemFour('4ITEM-FOUR'),
 
   /// Incorrect name has been replaced. Original name: `5иллегалчарактер`.
   @JsonValue('5иллегалчарактер')

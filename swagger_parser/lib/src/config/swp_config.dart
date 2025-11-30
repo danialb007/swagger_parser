@@ -1,3 +1,4 @@
+import 'package:args/args.dart';
 import 'package:yaml/yaml.dart';
 
 import '../generator/config/generator_config.dart';
@@ -38,6 +39,10 @@ class SWPConfig {
     this.useFreezed3 = false,
     this.useMultipartFile = false,
     this.fallbackUnion,
+    this.excludeTags = const <String>[],
+    this.includeTags = const <String>[],
+    this.fallbackClient = 'fallback',
+    this.mergeOutputs = false,
   });
 
   /// Internal constructor of [SWPConfig]
@@ -69,6 +74,10 @@ class SWPConfig {
     required this.useXNullable,
     required this.useFreezed3,
     required this.useMultipartFile,
+    required this.excludeTags,
+    required this.includeTags,
+    required this.fallbackClient,
+    required this.mergeOutputs,
     this.fallbackUnion,
   });
 
@@ -224,6 +233,44 @@ class SWPConfig {
     final fallbackUnion =
         yamlMap['fallback_union'] as String? ?? rootConfig?.fallbackUnion;
 
+    final excludedTagsYaml = yamlMap['exclude_tags'] as YamlList?;
+    List<String>? excludedTags;
+    if (excludedTagsYaml != null) {
+      excludedTags = [];
+      for (final t in excludedTagsYaml) {
+        if (t is! String) {
+          throw const ConfigException(
+            "Config parameter 'exclude_tags' values must be List of String.",
+          );
+        }
+        excludedTags.add(t);
+      }
+    } else if (rootConfig?.excludeTags != null) {
+      excludedTags = List.from(rootConfig!.excludeTags);
+    }
+
+    final includedTagsYaml = yamlMap['include_tags'] as YamlList?;
+    List<String>? includedTags;
+    if (includedTagsYaml != null) {
+      includedTags = [];
+      for (final t in includedTagsYaml) {
+        if (t is! String) {
+          throw const ConfigException(
+            "Config parameter 'include_tags' values must be List of String.",
+          );
+        }
+        includedTags.add(t);
+      }
+    } else if (rootConfig?.includeTags != null) {
+      includedTags = List.from(rootConfig!.includeTags);
+    }
+
+    final fallbackClient =
+        yamlMap['fallback_client'] as String? ?? rootConfig?.fallbackClient;
+
+    final mergeOutputs =
+        yamlMap['merge_outputs'] as bool? ?? rootConfig?.mergeOutputs;
+
     // Default config
     final dc = SWPConfig(name: name, outputDirectory: outputDirectory);
 
@@ -258,6 +305,37 @@ class SWPConfig {
       useFreezed3: useFreezed3 ?? dc.useFreezed3,
       useMultipartFile: useMultipartFile ?? dc.useMultipartFile,
       fallbackUnion: fallbackUnion,
+      excludeTags: excludedTags ?? dc.excludeTags,
+      includeTags: includedTags ?? dc.includeTags,
+      fallbackClient: fallbackClient ?? dc.fallbackClient,
+      mergeOutputs: mergeOutputs ?? dc.mergeOutputs,
+    );
+  }
+
+  /// Creates a [SWPConfig] from [YamlMap] with CLI [argResults] overrides.
+  factory SWPConfig.fromYamlWithOverrides(
+    YamlMap yamlMap,
+    ArgResults? argResults, {
+    bool isRootConfig = false,
+    SWPConfig? rootConfig,
+  }) {
+    // Apply CLI overrides to YAML map
+    final mergedConfig = Map<String, dynamic>.from(yamlMap);
+
+    if (argResults != null) {
+      for (final option in argResults.options) {
+        mergedConfig[option] = argResults[option];
+      }
+    }
+
+    // Create YAML map from merged config
+    final mergedYamlMap = YamlMap.wrap(mergedConfig);
+
+    // Use existing fromYaml method with merged configuration
+    return SWPConfig.fromYaml(
+      mergedYamlMap,
+      isRootConfig: isRootConfig,
+      rootConfig: rootConfig,
     );
   }
 
@@ -380,6 +458,31 @@ class SWPConfig {
   /// Optional. Set fallback consctructor name to use fallbackUnion parameter when using Freezed annotation.
   final String? fallbackUnion;
 
+  /// DART ONLY
+  /// Optional. Set excluded tags.
+  ///
+  /// Endpoints with these tags will not be included in the generated clients.
+  final List<String> excludeTags;
+
+  /// DART ONLY
+  /// Optional. Set included tags.
+  ///
+  /// If set, only endpoints with these tags will be included in the generated clients.
+  /// **NOTE: This will override the [excludeTags] if set.**
+  final List<String> includeTags;
+
+  /// DART ONLY
+  /// Optional. Fallback client name for endpoints without tags.
+  ///
+  /// defaults to 'fallback' which results in a client named `FallbackClient`.
+  final String fallbackClient;
+
+  /// Optional. Set to true to merge all generated code into a single file.
+  ///
+  /// This is useful when using swagger_parser together with build_runner, which needs to map
+  /// input files to output files 1-to-1.
+  final bool mergeOutputs;
+
   /// Convert [SWPConfig] to [GeneratorConfig]
   GeneratorConfig toGeneratorConfig() {
     return GeneratorConfig(
@@ -404,6 +507,7 @@ class SWPConfig {
       useFreezed3: useFreezed3,
       useMultipartFile: useMultipartFile,
       fallbackUnion: fallbackUnion,
+      mergeOutputs: mergeOutputs,
     );
   }
 
@@ -423,6 +527,9 @@ class SWPConfig {
       skippedParameters: skippedParameters,
       replacementRules: replacementRules,
       useXNullable: useXNullable,
+      excludeTags: excludeTags,
+      includeTags: includeTags,
+      fallbackClient: fallbackClient,
     );
   }
 }

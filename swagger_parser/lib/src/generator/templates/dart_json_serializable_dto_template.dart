@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../../utils/type_utils.dart';
 import '../model/programming_language.dart';
@@ -14,7 +14,7 @@ String dartJsonSerializableDtoTemplate(
 }) {
   final className = dataClass.name.toPascal;
   return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${ioImport(dataClass.parameters, useMultipartFile: useMultipartFile)}import 'package:json_annotation/json_annotation.dart';
+${ioImport(dataClass.parameters, useMultipartFile: useMultipartFile)}import 'package:json_annotation/json_annotation.dart';
 ${dartImports(imports: dataClass.imports)}
 part '${dataClass.name.toSnake}.g.dart';
 

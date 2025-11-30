@@ -1,3 +1,28 @@
+## 1.30.0
+- Add support for merging all generated code into single output file using the `merge_outputs` option
+
+## 1.29.0
+### Features
+- Add support for non-discriminated unions (`oneOf`/`anyOf` without a discriminator)
+- Filter out unused schemas when using `include_tags` or `exclude_tags`
+
+### Fixes
+- Fix the client name for untagged paths to properly fall back to the configured `fallback_client` instead of `client`
+- Fix the `fallback_client` configuration to default to `fallback` instead of `default` to avoid conflicts with the Dart `default` keyword in the generated code
+- Fix OpenAPI spec parsing to correctly preserve casing for `SCREAMING_SNAKE_CASE`
+- Fix filtering so paths without tags are filtered out when `include_tags` is specified
+
+## 1.28.0
+- Fix documentation
+- Fix ensure consistent file naming for tags with alphanumeric suffixes
+
+## 1.27.0
+ - Allow to filter the generation of endpoints in a client by tags
+ - Allow to define a fallback client for endpoints that do not have a tag - fixes [[#271](https://github.com/Carapacik/swagger_parser/issues/271)] 
+
+## 1.26.4
+ - Allow the use of single MultipartFile arguments in multipart requests (requires retrofit_generator 10.0.1 or later)
+
 ## 1.26.3
 - Fix for the bug when untagged endpoints and tagged as `Client` will override each other which
   results in `Client` tagged overwritten during file creation

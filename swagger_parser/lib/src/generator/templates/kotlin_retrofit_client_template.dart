@@ -1,5 +1,5 @@
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../../utils/type_utils.dart';
 import '../model/programming_language.dart';
@@ -9,10 +9,9 @@ import '../model/programming_language.dart';
 String kotlinRetrofitClientTemplate({
   required UniversalRestClient restClient,
   required String name,
-  required bool markFileAsGenerated,
 }) {
   final sb = StringBuffer('''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated, ignoreLints: false)}import retrofit2.http.*
+import retrofit2.http.*
 
 interface $name {''');
   for (final request in restClient.requests) {

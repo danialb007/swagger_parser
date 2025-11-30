@@ -1,5 +1,5 @@
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 
 String dartRootClientTemplate({
@@ -9,6 +9,7 @@ String dartRootClientTemplate({
   required String postfix,
   required bool putClientsInFolder,
   required bool markFileAsGenerated,
+  Map<String, String>? clientsNameMap,
 }) {
   if (clientsNames.isEmpty) {
     return '';
@@ -31,8 +32,8 @@ String dartRootClientTemplate({
       '${title ?? ''}${version != null ? ' `v$version`' : ''}${fullDescription != null ? '\n\n$fullDescription' : ''}';
 
   return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}import 'package:dio/dio.dart';
-${_clientsImport(clientsNames, postfix, putClientsInFolder: putClientsInFolder)}
+import 'package:dio/dio.dart';
+${_clientsImport(clientsNames, postfix, putClientsInFolder: putClientsInFolder, clientsNameMap: clientsNameMap)}
 ${descriptionComment(comment)}class $className {
   $className(
     Dio dio, {
@@ -53,9 +54,13 @@ ${_getters(clientsNames, postfix)}
 }
 
 String _clientsImport(Set<String> imports, String postfix,
-        {required bool putClientsInFolder}) =>
-    '\n${imports.map((import) => "import '${putClientsInFolder ? 'clients' : import.toSnake}/"
-        "${'${import}_$postfix'.toSnake}.dart';").join('\n')}\n';
+    {required bool putClientsInFolder, Map<String, String>? clientsNameMap}) {
+  return '\n${imports.map((import) {
+    final snakeName = clientsNameMap?[import] ?? import.toSnake;
+    return "import '${putClientsInFolder ? 'clients' : snakeName}/"
+        "${snakeName}_${postfix.toSnake}.dart';";
+  }).join('\n')}\n';
+}
 
 String _privateFields(Set<String> names, String postfix) => names
     .map((n) => '  ${n.toPascal + postfix.toPascal}? _${n.toCamel};')

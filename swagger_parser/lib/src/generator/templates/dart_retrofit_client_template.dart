@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../../utils/type_utils.dart';
 import '../model/programming_language.dart';
@@ -10,21 +10,21 @@ import '../model/programming_language.dart';
 String dartRetrofitClientTemplate({
   required UniversalRestClient restClient,
   required String name,
-  required bool markFileAsGenerated,
   required String defaultContentType,
   required bool useMultipartFile,
   bool extrasParameterByDefault = false,
   bool dioOptionsParameterByDefault = false,
   bool originalHttpResponse = false,
+  String? fileName,
 }) {
   final parameterTypes = restClient.requests
       .expand((r) => r.parameters.map((p) => p.type))
       .toSet();
   final sb = StringBuffer('''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${_convertImport(restClient)}${ioImport(parameterTypes, useMultipartFile: useMultipartFile)}import 'package:dio/dio.dart'${_hideHeaders(restClient, defaultContentType)};
+${_convertImport(restClient)}${ioImport(parameterTypes, useMultipartFile: useMultipartFile)}import 'package:dio/dio.dart'${_hideHeaders(restClient, defaultContentType)};
 import 'package:retrofit/retrofit.dart';
 ${dartImports(imports: restClient.imports, pathPrefix: '../models/')}
-part '${name.toSnake}.g.dart';
+part '${fileName ?? name.toSnake}.g.dart';
 
 @RestApi()
 abstract class $name {
@@ -135,12 +135,16 @@ String _toParameter(UniversalRequestType parameter, bool useMultipartFile) {
 
   // https://github.com/trevorwang/retrofit.dart/issues/661
   // The Word `value` cant be used a a keyword argument
-  final keywordArguments = parameter.type.name!.toCamel.replaceFirst(
+  final keywordArguments = parameter.type.name!.replaceFirst(
     'value',
     'value_',
   );
 
-  return '    @${parameter.parameterType.type}'
+  final deprecatedAnnotation = parameter.deprecated
+      ? "    @Deprecated('This is marked as deprecated')\n"
+      : '';
+
+  return '$deprecatedAnnotation    @${parameter.parameterType.type}'
       "(${parameter.name != null && !parameter.parameterType.isBody ? "${parameter.parameterType.isPart ? 'name: ' : ''}${_startWith$(parameter.name!) ? 'r' : ''}'${parameter.name}'" : ''}) "
       '${_required(parameter.type)}'
       '${isEnum || isDate ? 'String${parameter.type.nullable ? '?' : ''}' : parameterType} '

@@ -78,26 +78,24 @@ class _GeneratorContentState extends State<GeneratorContent> {
                 const SizedBox(height: 24),
                 ListenableBuilder(
                   listenable: _fileContent,
-                  builder:
-                      (context, child) =>
-                          _fileContent.text.isEmpty
-                              ? const SizedBox.shrink()
-                              : Padding(
-                                padding: const EdgeInsets.only(bottom: 48),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  height: 48,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xb3c92b16),
-                                    ),
-                                    onPressed: () async {
-                                      _fileContent.clear();
-                                    },
-                                    child: const Text('Clear'),
-                                  ),
-                                ),
+                  builder: (context, child) => _fileContent.text.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(bottom: 48),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xb3c92b16),
                               ),
+                              onPressed: () async {
+                                _fileContent.clear();
+                              },
+                              child: const Text('Clear'),
+                            ),
+                          ),
+                        ),
                 ),
                 Expanded(
                   child: TextField(
@@ -146,10 +144,9 @@ class _GeneratorContentState extends State<GeneratorContent> {
                 const SizedBox(height: 16),
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 600),
-                  crossFadeState:
-                      _language == ProgrammingLanguage.dart
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
+                  crossFadeState: _language == ProgrammingLanguage.dart
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
                   sizeCurve: Curves.fastOutSlowIn,
                   // for correct animation
                   firstChild: Container(),
@@ -179,22 +176,20 @@ class _GeneratorContentState extends State<GeneratorContent> {
                   style: const TextStyle(fontSize: 24),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text('Is JSON file content'),
-                        value: _isJson,
-                        onChanged: (value) => setState(() => _isJson = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text('Is JSON file content'),
+                    value: _isJson,
+                    onChanged: (value) => setState(() => _isJson = value!),
+                  ),
                 ),
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 600),
-                  crossFadeState:
-                      _language == ProgrammingLanguage.dart
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
+                  crossFadeState: _language == ProgrammingLanguage.dart
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
                   sizeCurve: Curves.fastOutSlowIn,
                   firstChild: Container(),
                   secondChild: TextField(
@@ -211,25 +206,23 @@ class _GeneratorContentState extends State<GeneratorContent> {
                 ),
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 600),
-                  crossFadeState:
-                      _language == ProgrammingLanguage.dart
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
+                  crossFadeState: _language == ProgrammingLanguage.dart
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
                   sizeCurve: Curves.fastOutSlowIn,
                   firstChild: Container(),
                   secondChild: StatefulBuilder(
-                    builder:
-                        (context, setState) => CheckboxListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          title: const Text(
-                            'Generate root client for REST clients',
-                          ),
-                          value: _rootClient,
-                          onChanged:
-                              (value) => setState(() => _rootClient = value!),
-                        ),
+                    builder: (context, setState) => CheckboxListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text(
+                        'Generate root client for REST clients',
+                      ),
+                      value: _rootClient,
+                      onChanged: (value) =>
+                          setState(() => _rootClient = value!),
+                    ),
                   ),
                 ),
                 TextField(
@@ -244,106 +237,92 @@ class _GeneratorContentState extends State<GeneratorContent> {
                   style: const TextStyle(fontSize: 24),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text('Put all clients in clients folder'),
-                        value: _putClientsInFolder,
-                        onChanged:
-                            (value) =>
-                                setState(() => _putClientsInFolder = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text('Put all clients in clients folder'),
+                    value: _putClientsInFolder,
+                    onChanged: (value) =>
+                        setState(() => _putClientsInFolder = value!),
+                  ),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text('Squash all clients in one client'),
-                        value: _mergeClients,
-                        onChanged:
-                            (value) => setState(() => _mergeClients = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text('Squash all clients in one client'),
+                    value: _mergeClients,
+                    onChanged: (value) =>
+                        setState(() => _mergeClients = value!),
+                  ),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text('Generate method name from url path'),
-                        value: _pathMethodName,
-                        onChanged:
-                            (value) => setState(() => _pathMethodName = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text('Generate method name from url path'),
+                    value: _pathMethodName,
+                    onChanged: (value) =>
+                        setState(() => _pathMethodName = value!),
+                  ),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text('Mark files as generated'),
-                        value: _markFilesAsGenerated,
-                        onChanged:
-                            (value) =>
-                                setState(() => _markFilesAsGenerated = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text('Mark files as generated'),
+                    value: _markFilesAsGenerated,
+                    onChanged: (value) =>
+                        setState(() => _markFilesAsGenerated = value!),
+                  ),
                 ),
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 600),
-                  crossFadeState:
-                      _language == ProgrammingLanguage.dart
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
+                  crossFadeState: _language == ProgrammingLanguage.dart
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
                   sizeCurve: Curves.fastOutSlowIn,
                   // for correct animation
                   firstChild: Container(),
                   secondChild: StatefulBuilder(
-                    builder:
-                        (context, setState) => CheckboxListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          title: const Text('Generate to json in Enum'),
-                          value: _enumsToJson,
-                          onChanged:
-                              (value) => setState(() => _enumsToJson = value!),
-                        ),
+                    builder: (context, setState) => CheckboxListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text('Generate to json in Enum'),
+                      value: _enumsToJson,
+                      onChanged: (value) =>
+                          setState(() => _enumsToJson = value!),
+                    ),
                   ),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text(
-                          'Generate enum name with prefix from parent component',
-                        ),
-                        value: _enumsParentPrefix,
-                        onChanged:
-                            (value) =>
-                                setState(() => _enumsParentPrefix = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text(
+                      'Generate enum name with prefix from parent component',
+                    ),
+                    value: _enumsParentPrefix,
+                    onChanged: (value) =>
+                        setState(() => _enumsParentPrefix = value!),
+                  ),
                 ),
                 StatefulBuilder(
-                  builder:
-                      (context, setState) => CheckboxListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text(
-                          r'Generate $unknown element in enums',
-                        ),
-                        value: _unknownEnumValue,
-                        onChanged:
-                            (value) =>
-                                setState(() => _unknownEnumValue = value!),
-                      ),
+                  builder: (context, setState) => CheckboxListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text(r'Generate $unknown element in enums'),
+                    value: _unknownEnumValue,
+                    onChanged: (value) =>
+                        setState(() => _unknownEnumValue = value!),
+                  ),
                 ),
                 const SizedBox(height: 32),
                 SizedBox(

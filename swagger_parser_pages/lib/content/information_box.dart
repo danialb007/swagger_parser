@@ -20,21 +20,20 @@ class InformationBox extends StatelessWidget {
                 baseline: TextBaseline.alphabetic,
                 child: Link(
                   uri: Uri.parse('https://pub.dev/packages/swagger_parser'),
-                  builder:
-                      (context, followLink) => MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: followLink,
-                          child: const Text(
-                            'swagger_parser',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Color(0xFFD0BCFF),
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
+                  builder: (context, followLink) => MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: followLink,
+                      child: const Text(
+                        'swagger_parser',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Color(0xFFD0BCFF),
+                          decoration: TextDecoration.underline,
                         ),
                       ),
+                    ),
+                  ),
                 ),
               ),
               const TextSpan(
@@ -118,21 +117,20 @@ class InformationBox extends StatelessWidget {
                         baseline: TextBaseline.alphabetic,
                         child: Link(
                           uri: Uri.parse('https://pub.dev/packages/freezed'),
-                          builder:
-                              (context, followLink) => MouseRegion(
-                                cursor: SystemMouseCursors.click,
-                                child: GestureDetector(
-                                  onTap: followLink,
-                                  child: const Text(
-                                    'freezed',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Color(0xFFD0BCFF),
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
+                          builder: (context, followLink) => MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: followLink,
+                              child: const Text(
+                                'freezed',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Color(0xFFD0BCFF),
+                                  decoration: TextDecoration.underline,
                                 ),
                               ),
+                            ),
+                          ),
                         ),
                       ),
                     ],

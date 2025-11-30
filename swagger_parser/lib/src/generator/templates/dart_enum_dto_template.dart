@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../model/json_serializer.dart';
 import 'dart_import_dto_template.dart';
@@ -19,7 +19,6 @@ String dartEnumDtoTemplate(
       enumClass,
       enumsToJson: enumsToJson,
       unknownEnumValue: unknownEnumValue,
-      markFileAsGenerated: markFileAsGenerated,
     );
   } else {
     final className = enumClass.name.toPascal;
@@ -40,7 +39,7 @@ String dartEnumDtoTemplate(
     ];
 
     return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${dartImportDtoTemplate(jsonSerializer)}
+${dartImportDtoTemplate(jsonSerializer)}
 
 ${descriptionComment(enumClass.description)}@JsonEnum()
 enum $className {
@@ -54,7 +53,6 @@ String _dartEnumDartMappableTemplate(
   UniversalEnumClass enumClass, {
   required bool enumsToJson,
   required bool unknownEnumValue,
-  required bool markFileAsGenerated,
 }) {
   final className = enumClass.name.toPascal;
   final jsonParam = unknownEnumValue || enumsToJson;
@@ -83,7 +81,7 @@ String _dartEnumDartMappableTemplate(
   ];
 
   return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${dartImportDtoTemplate(JsonSerializer.dartMappable)}
+${dartImportDtoTemplate(JsonSerializer.dartMappable)}
 
 part '${enumClass.name.toSnake}.mapper.dart';
 

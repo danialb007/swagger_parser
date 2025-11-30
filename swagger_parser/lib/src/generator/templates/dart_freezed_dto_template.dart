@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../../utils/type_utils.dart';
 import '../model/programming_language.dart';
@@ -9,32 +9,42 @@ import '../model/programming_language.dart';
 /// Provides template for generating dart DTO using freezed
 String dartFreezedDtoTemplate(
   UniversalComponentClass dataClass, {
-  required bool markFileAsGenerated,
   required bool useMultipartFile,
   bool generateValidator = false,
   bool isV3 = false,
   String? fallbackUnion,
 }) {
   final className = dataClass.name.toPascal;
+  final discriminator = dataClass.discriminator;
+  final isUndiscriminatedUnion =
+      dataClass.undiscriminatedUnionVariants?.isNotEmpty ?? false;
+  final isUnion = discriminator != null || isUndiscriminatedUnion;
   return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated)}${ioImport(dataClass.parameters, useMultipartFile: useMultipartFile)}import 'package:freezed_annotation/freezed_annotation.dart';
-${dartImports(imports: dataClass.imports)}
+${ioImport(dataClass.parameters, useMultipartFile: useMultipartFile)}import 'package:freezed_annotation/freezed_annotation.dart';
+${isUndiscriminatedUnion ? "import 'package:json_annotation/json_annotation.dart';\n" : ''}${dartImports(imports: dataClass.imports)}
 part '${dataClass.name.toSnake}.freezed.dart';
 part '${dataClass.name.toSnake}.g.dart';
 
 ${descriptionComment(dataClass.description)}@Freezed(${[
-    if (dataClass.discriminator != null)
-      "unionKey: '${dataClass.discriminator!.propertyName}'",
-    if (dataClass.discriminator != null &&
+    if (discriminator != null) "unionKey: '${discriminator.propertyName}'",
+    if (discriminator != null &&
         fallbackUnion != null &&
         fallbackUnion.isNotEmpty)
       "fallbackUnion: '$fallbackUnion'",
   ].join(', ')})
-${dataClass.discriminator != null ? 'sealed ' : isV3 ? 'abstract ' : ''}class $className with _\$$className {
-${_factories(dataClass, className, useMultipartFile, fallbackUnion)}
-  \n  factory $className.fromJson(Map<String, Object?> json) => _\$${className}FromJson(json);
+${_classModifier(isUnion: isUnion, isV3: isV3)}class $className with _\$$className {
+${_factories(dataClass, className, useMultipartFile, fallbackUnion, isUnion: isUnion)}
+${_jsonFactories(className, dataClass.undiscriminatedUnionVariants)}
 ${generateValidator ? dataClass.parameters.map(_validationString).nonNulls.join() : ''}}
 ${generateValidator ? _validateMethod(className, dataClass.parameters) : ''}''';
+}
+
+String _classModifier({required bool isUnion, required bool isV3}) {
+  return switch ((isUnion, isV3)) {
+    (true, _) => 'sealed ',
+    (false, true) => 'abstract ',
+    _ => '',
+  };
 }
 
 String _validateMethod(String className, Set<UniversalType> types) {
@@ -161,10 +171,20 @@ String _validateMethod(String className, Set<UniversalType> types) {
 }
 
 String _factories(UniversalComponentClass dataClass, String className,
-    bool useMultipartFile, String? fallbackUnion) {
-  if (dataClass.discriminator == null) {
+    bool useMultipartFile, String? fallbackUnion,
+    {required bool isUnion}) {
+  if (!isUnion) {
     return '''
   const factory $className(${dataClass.parameters.isNotEmpty ? '{' : ''}${_parametersToString(dataClass.parameters, useMultipartFile)}${dataClass.parameters.isNotEmpty ? '\n  }' : ''}) = _$className;''';
+  }
+
+  if (dataClass.undiscriminatedUnionVariants case final variants?
+      when variants.isNotEmpty) {
+    return _createFactoriesForUndiscriminatedUnion(
+      className,
+      variants,
+      useMultipartFile,
+    );
   }
 
   final factories = <String>[];
@@ -191,6 +211,55 @@ String _factories(UniversalComponentClass dataClass, String className,
   }
 
   return factories.join('\n');
+}
+
+String _createFactoriesForUndiscriminatedUnion(String className,
+    Map<String, Set<UniversalType>> variants, bool useMultipartFile) {
+  final factories = <String>[];
+  for (final MapEntry(key: variantName, value: factoryParameters)
+      in variants.entries) {
+    final factoryName = variantName.toCamel;
+    final unionItemClassName = className + variantName.toPascal;
+    factories.add('''
+  @JsonSerializable()
+  const factory $className.$factoryName(${factoryParameters.isNotEmpty ? '{' : ''}${_parametersToString(factoryParameters, useMultipartFile)}${factoryParameters.isNotEmpty ? '\n  }' : ''}) = $unionItemClassName;
+  ''');
+  }
+  return factories.join('\n');
+}
+
+String _jsonFactories(String className,
+    Map<String, Set<UniversalType>>? undiscriminatedUnionVariants) {
+  if (undiscriminatedUnionVariants case final unionVariants?
+      when unionVariants.isNotEmpty) {
+    return '${_fromJsonUndiscriminatedUnion(className)}\n'
+        '${_toJsonUndiscriminatedUnion(className, unionVariants)}';
+  }
+
+  return '  \n  factory $className.fromJson(Map<String, Object?> json) => _\$${className}FromJson(json);';
+}
+
+String _fromJsonUndiscriminatedUnion(String className) => '''
+
+  factory $className.fromJson(Map<String, Object?> json) =>
+      // TODO: Deserialization must be implemented by the user, because the OpenAPI specification did not provide a discriminator.
+      // Use _\$\$$className<UnionName>ImplFromJson(json) to deserialize the union <UnionName>.
+      throw UnimplementedError();
+''';
+
+String _toJsonUndiscriminatedUnion(
+  String className,
+  Map<String, Set<UniversalType>> undiscriminatedUnionVariants,
+) {
+  final cases = {
+    for (final variant in undiscriminatedUnionVariants.keys)
+      '        $className${variant.toPascal}() => _\$\$$className${variant.toPascal}ImplToJson(this),'
+  };
+
+  return '''
+  Map<String, Object?> toJson() => switch (this) {
+${cases.join('\n')}
+      };''';
 }
 
 String? _validationString(UniversalType type) {
@@ -255,8 +324,13 @@ String _parametersToString(
 
 String _jsonKey(UniversalType t) {
   final sb = StringBuffer();
-  if ((t.jsonKey == null || t.name == t.jsonKey) && t.defaultValue == null) {
+  if ((t.jsonKey == null || t.name == t.jsonKey) &&
+      t.defaultValue == null &&
+      !t.deprecated) {
     return '';
+  }
+  if (t.deprecated) {
+    sb.write("    @Deprecated('This is marked as deprecated')\n");
   }
   if (t.jsonKey != null && t.name != t.jsonKey) {
     sb.write("    @JsonKey(name: '${protectJsonKey(t.jsonKey)}')\n");

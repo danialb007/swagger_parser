@@ -8,6 +8,7 @@ import 'package:yaml/yaml.dart';
 import '../config/parser_config.dart';
 import '../corrector/open_api_corrector.dart';
 import '../exception/open_api_parser_exception.dart';
+import '../model/normalized_identifier.dart';
 import '../model/open_api_info.dart';
 import '../model/universal_collections.dart';
 import '../model/universal_data_class.dart';
@@ -15,7 +16,8 @@ import '../model/universal_request.dart';
 import '../model/universal_request_type.dart';
 import '../model/universal_rest_client.dart';
 import '../model/universal_type.dart';
-import '../utils/case_utils.dart';
+import '../utils/anchor_registry.dart';
+import '../utils/context_stack.dart';
 import '../utils/http_utils.dart';
 import '../utils/type_utils.dart';
 
@@ -41,6 +43,10 @@ class OpenApiParser {
   final _usedNamesCount = <String, int>{};
   final _skipDataClasses = <String>[];
   final _objectNamesCount = <String, int>{};
+  final _usedSchemas = <String>{};
+  final _schemaDependencies = <String, Set<String>>{};
+  final _anchorRegistry = AnchorRegistry();
+  final _contextStack = ContextStack();
 
   static const _additionalPropertiesConst = 'additionalProperties';
   static const _allOfConst = 'allOf';
@@ -182,8 +188,13 @@ class OpenApiParser {
           (contentTypeValue[_schemaConst] as Map<String, dynamic>).isEmpty) {
         return null;
       }
+      final schemaMap = contentTypeValue[_schemaConst] as Map<String, dynamic>;
+
+      // Track schema references for filtering
+      _extractSchemaRefs(schemaMap, null);
+
       final typeWithImport = _findType(
-        contentTypeValue[_schemaConst] as Map<String, dynamic>,
+        schemaMap,
         additionalName: additionalName,
         // Return type is most often required in any case
         isRequired: true,
@@ -270,6 +281,8 @@ class OpenApiParser {
                     parameterType.isBody && parameter[_nameConst] == _bodyConst
                         ? null
                         : parameter[_nameConst].toString(),
+                deprecated:
+                    parameter[_deprecatedConst].toString().toBool() ?? false,
               ),
             );
           }
@@ -344,6 +357,11 @@ class OpenApiParser {
           )) {
             final isRequired =
                 requestBody[_requiredConst]?.toString().toBool() ?? false;
+
+            // Track schema references for filtering
+            _extractSchemaRefs(
+                contentType[_schemaConst] as Map<String, dynamic>, null);
+
             final typeWithImport = _findType(
               contentType[_schemaConst] as Map<String, dynamic>,
               isRequired: isRequired,
@@ -392,7 +410,7 @@ class OpenApiParser {
                 description: currentType.description,
                 type: UniversalType(
                   type: currentType.type,
-                  name: propName,
+                  name: propName.toCamel,
                   description: currentType.description,
                   format:
                       currentType.format ?? propValue[_formatConst] as String?,
@@ -400,6 +418,7 @@ class OpenApiParser {
                   isRequired: currentType.isRequired,
                   nullable: currentType.nullable,
                   wrappingCollections: currentType.wrappingCollections,
+                  deprecated: currentType.deprecated,
                 ),
               ),
             );
@@ -407,6 +426,11 @@ class OpenApiParser {
         } else {
           final isRequired =
               requestBody[_requiredConst]?.toString().toBool() ?? false;
+
+          // Track schema references for filtering
+          _extractSchemaRefs(
+              contentType[_schemaConst] as Map<String, dynamic>, null);
+
           final typeWithImport = _findType(
             contentType[_schemaConst] as Map<String, dynamic>,
             isRequired: isRequired,
@@ -429,6 +453,7 @@ class OpenApiParser {
                 isRequired: currentType.isRequired,
                 nullable: currentType.nullable,
                 wrappingCollections: currentType.wrappingCollections,
+                deprecated: currentType.deprecated,
               ),
             ),
           );
@@ -447,8 +472,13 @@ class OpenApiParser {
         return null;
       }
 
+      final schemaMap = code2xx[_schemaConst] as Map<String, dynamic>? ?? {};
+
+      // Track schema references for filtering
+      _extractSchemaRefs(schemaMap, null);
+
       final typeWithImport = _findType(
-        code2xx[_schemaConst] as Map<String, dynamic>? ?? {},
+        schemaMap,
         additionalName: additionalName,
         // Return type is most often required in any case
         isRequired: true,
@@ -464,6 +494,7 @@ class OpenApiParser {
             // List<dynamic> is not supported by Retrofit, use dynamic instead
             type.type == _objectConst ? const [] : type.wrappingCollections,
         isRequired: typeWithImport.type.isRequired,
+        deprecated: type.deprecated,
       );
     }
 
@@ -543,6 +574,8 @@ class OpenApiParser {
               name: parameterType.isBody && parameter[_nameConst] == _bodyConst
                   ? null
                   : parameter[_nameConst].toString(),
+              deprecated:
+                  parameter[_deprecatedConst].toString().toBool() ?? false,
             ),
           );
         }
@@ -570,99 +603,113 @@ class OpenApiParser {
       }
 
       pathValue.forEach((key, requestPath) {
-        // `servers` contains List<dynamic>
-        if (key == _serversConst ||
-            key == _parametersConst ||
-            key.startsWith('x-')) {
-          return;
-        }
-
-        final requestPathResponses = (requestPath
-            as Map<String, dynamic>)[_responsesConst] as Map<String, dynamic>;
-        final additionalName = '$key${path}Response'.toPascal;
-        final returnType = _apiInfo.schemaVersion == OAS.v2
-            ? returnTypeV2(requestPathResponses, additionalName)
-            : returnTypeV3(requestPathResponses, additionalName);
-        final parameters = _apiInfo.schemaVersion == OAS.v2
-            ? parametersV2(requestPath)
-            : parametersV3(requestPath);
-
-        // Add global parameters that have not been overridden by local parameters
-        // defined at the request level.
-        parameters.addAll(
-          globalParameters.where(
-            (e) =>
-                parameters.every((p) => p.name != e.name && p.type != e.type),
-          ),
-        );
-
-        // Build full description
-        final summary = requestPath[_summaryConst]?.toString().trim();
-        var description = requestPath[_descriptionConst]?.toString().trim();
-        description = switch ((summary, description)) {
-          (null, null) || ('', '') => null,
-          (_, null) || (_, '') => summary,
-          (null, _) || ('', _) => description,
-          (_, _) => '$summary\n\n$description',
-        };
-        final parametersDescription = parameters
-            .where((e) => e.description != null)
-            .map((e) => '[${e.name?.toCamel ?? 'body'}] - ${e.description}')
-            .join('\n\n')
-            .trim();
-        description = switch ((description, parametersDescription)) {
-          (null, '') || ('', '') => null,
-          (_, '') => description,
-          (null, _) || ('', _) => parametersDescription,
-          (_, _) => '$description\n\n$parametersDescription',
-        };
-        // End build full description
-
-        String requestName;
-
-        if (config.pathMethodName) {
-          requestName = (key + path).toCamel;
-        } else {
-          final operationIdName =
-              requestPath[_operationIdConst]?.toString().toCamel;
-          final (_, nameDescription) = protectName(operationIdName);
-          if (nameDescription != null) {
-            description = '$description\n\n$nameDescription';
-            requestName = (key + path).toCamel;
-          } else {
-            requestName = operationIdName ?? (key + path).toCamel;
+        // Process this path/method within its context
+        _contextStack.withContext('path:$path:$key', () {
+          // check if this requestPath has any tags that
+          // define wether the requestPath should be included
+          if (!_isPathIncluded(requestPath as Map<String, dynamic>)) {
+            return;
           }
-        }
 
-        final request = UniversalRequest(
-          name: requestName,
-          description: description,
-          requestType: HttpRequestType.fromString(key)!,
-          route: path,
-          contentType: resultContentType,
-          returnType: returnType,
-          parameters: parameters,
-          isDeprecated:
-              requestPath[_deprecatedConst].toString().toBool() ?? false,
-        );
-        final currentTag = _getTag(requestPath);
-        final sameTagIndex = restClients.indexWhere(
-          (e) => e.name.toLowerCase() == currentTag.toLowerCase(),
-        );
-        if (sameTagIndex == -1) {
-          restClients.add(
-            UniversalRestClient(
-              name: currentTag,
-              requests: [request],
-              imports: SplayTreeSet<String>.of(imports),
+          _anchorRegistry.markContextAsIncluded(_contextStack.current!);
+
+          // `servers` contains List<dynamic>
+          if (key == _serversConst ||
+              key == _parametersConst ||
+              key.startsWith('x-')) {
+            return;
+          }
+
+          final requestPathResponses =
+              requestPath[_responsesConst] as Map<String, dynamic>;
+          final additionalName = '$key${path}Response'.toPascal;
+          final returnType = _apiInfo.schemaVersion == OAS.v2
+              ? returnTypeV2(requestPathResponses, additionalName)
+              : returnTypeV3(requestPathResponses, additionalName);
+          final parameters = _apiInfo.schemaVersion == OAS.v2
+              ? parametersV2(requestPath)
+              : parametersV3(requestPath);
+
+          // Add global parameters that have not been overridden by local parameters
+          // defined at the request level.
+          parameters.addAll(
+            globalParameters.where(
+              (e) =>
+                  parameters.every((p) => p.name != e.name && p.type != e.type),
             ),
           );
-        } else {
-          restClients[sameTagIndex].requests.add(request);
-          restClients[sameTagIndex].imports.addAll(imports);
-        }
-        resultContentType = config.defaultContentType;
-        imports.clear();
+
+          // Build full description
+          final summary = requestPath[_summaryConst]?.toString().trim();
+          var description = requestPath[_descriptionConst]?.toString().trim();
+          description = switch ((summary, description)) {
+            (null, null) || ('', '') => null,
+            (_, null) || (_, '') => summary,
+            (null, _) || ('', _) => description,
+            (_, _) => '$summary\n\n$description',
+          };
+          final parametersDescription = parameters
+              .where((e) => e.description != null)
+              .map((e) => '[${e.name?.toCamel ?? 'body'}] - ${e.description}')
+              .join('\n\n')
+              .trim();
+          description = switch ((description, parametersDescription)) {
+            (null, '') || ('', '') => null,
+            (_, '') => description,
+            (null, _) || ('', _) => parametersDescription,
+            (_, _) => '$description\n\n$parametersDescription',
+          };
+          // End build full description
+
+          String requestName;
+
+          if (config.pathMethodName) {
+            requestName = (key + path).toCamel;
+          } else {
+            final operationIdName =
+                requestPath[_operationIdConst]?.toString().toCamel;
+            final (_, nameDescription) = protectName(operationIdName);
+            if (nameDescription != null) {
+              description = '$description\n\n$nameDescription';
+              requestName = (key + path).toCamel;
+            } else {
+              requestName = operationIdName ?? (key + path).toCamel;
+            }
+          }
+
+          final request = UniversalRequest(
+            name: requestName,
+            description: description,
+            requestType: HttpRequestType.fromString(key)!,
+            route: path,
+            contentType: resultContentType,
+            returnType: returnType,
+            parameters: parameters,
+            isDeprecated:
+                requestPath[_deprecatedConst].toString().toBool() ?? false,
+          );
+          // we are converting the tag to the snake case
+          // later tag is used to determine the file name
+          final currentTag =
+              (_getTag(requestPath) ?? config.fallbackClient).toSnake;
+          final sameTagIndex = restClients.indexWhere(
+            (e) => e.name == currentTag,
+          );
+          if (sameTagIndex == -1) {
+            restClients.add(
+              UniversalRestClient(
+                name: currentTag,
+                requests: [request],
+                imports: SplayTreeSet<String>.of(imports),
+              ),
+            );
+          } else {
+            restClients[sameTagIndex].requests.add(request);
+            restClients[sameTagIndex].imports.addAll(imports);
+          }
+          resultContentType = config.defaultContentType;
+          imports.clear();
+        });
       });
     });
     return restClients;
@@ -764,7 +811,7 @@ class OpenApiParser {
   }
 
   /// Parses data classes from `components` of definition file
-  /// and return list of  [UniversalDataClass]
+  /// and return list of [UniversalDataClass]
   List<UniversalDataClass> parseDataClasses() {
     final dataClasses = <UniversalDataClass>[];
     late final Map<String, dynamic> entities;
@@ -785,101 +832,120 @@ class OpenApiParser {
           _definitionFileContent[_definitionsConst] as Map<String, dynamic>;
     }
     entities.forEach((key, value) {
-      if (_skipDataClasses.contains(key)) {
-        return;
-      }
-
-      value as Map<String, dynamic>;
-
-      final refs = <String>{};
-      final parameters = <UniversalType>{};
-      final imports = SplayTreeSet<String>();
-
-      /// Used for find properties in map
-      void localFindParametersAndImports(Map<String, dynamic> map) {
-        final (findParameters, findImports) = _findParametersAndImports(
-          map,
-          additionalName: key,
-        );
-        parameters.addAll(findParameters);
-        imports.addAll(findImports);
-      }
-
-      if (value.containsKey(_propertiesConst)) {
-        localFindParametersAndImports(value);
-      } else if (value.containsKey(_enumConst)) {
-        final Set<UniversalEnumItem> items;
-        final values = (value[_enumConst] as List).map((e) => '$e');
-        if (value.containsKey(_enumNamesConst)) {
-          final names = (value[_enumNamesConst] as List).map((e) => '$e');
-          items = protectEnumItemsNamesAndValues(names, values);
-        } else {
-          items = protectEnumItemsNames(values);
+      _contextStack.withContext('schema:$key', () {
+        if (_skipDataClasses.contains(key)) {
+          return;
         }
-        final type = value[_typeConst].toString();
 
-        dataClasses.add(
-          _getUniqueEnumClass(
+        value as Map<String, dynamic>;
+
+        // Track schema dependencies for filtering
+        _extractSchemaDependencies(value, key);
+
+        final refs = <String>{};
+        final parameters = <UniversalType>{};
+        final imports = SplayTreeSet<String>();
+
+        /// Used for find properties in map
+        void localFindParametersAndImports(Map<String, dynamic> map) {
+          final (findParameters, findImports) = _findParametersAndImports(
+            map,
+            additionalName: key,
+          );
+          parameters.addAll(findParameters);
+          imports.addAll(findImports);
+        }
+
+        if (value.containsKey(_propertiesConst)) {
+          localFindParametersAndImports(value);
+        } else if (value.containsKey(_enumConst)) {
+          final Set<UniversalEnumItem> items;
+          final values = (value[_enumConst] as List).map((e) => '$e');
+          if (value.containsKey(_enumNamesConst)) {
+            final names = (value[_enumNamesConst] as List).map((e) => '$e');
+            items = protectEnumItemsNamesAndValues(names, values);
+          } else {
+            items = protectEnumItemsNames(values);
+          }
+          final type = value[_typeConst].toString();
+
+          dataClasses.add(
+            _getUniqueEnumClass(
+              name: key,
+              items: items,
+              type: type,
+              defaultValue: value[_defaultConst]?.toString(),
+              description: value[_descriptionConst]?.toString(),
+            ),
+          );
+          return;
+        } else if (value.containsKey(_typeConst) ||
+            value.containsKey(_refConst)) {
+          final typeWithImport = _findType(
+            value,
             name: key,
-            items: items,
-            type: type,
-            defaultValue: value[_defaultConst]?.toString(),
-            description: value[_descriptionConst]?.toString(),
-          ),
-        );
-        return;
-      } else if (value.containsKey(_typeConst) ||
-          value.containsKey(_refConst)) {
-        final typeWithImport = _findType(
-          value,
-          name: key,
-          // typeDef is always non-nullable
-          isRequired: true,
-        );
-        parameters.add(typeWithImport.type);
-        if (typeWithImport.import != null) {
-          imports.add(typeWithImport.import!);
+            // typeDef is always non-nullable
+            isRequired: true,
+          );
+          parameters.add(typeWithImport.type);
+          if (typeWithImport.import != null) {
+            imports.add(typeWithImport.import!);
+          }
+          dataClasses.add(
+            UniversalComponentClass(
+              name: key,
+              imports: imports,
+              parameters: parameters,
+              typeDef: true,
+              description: value[_descriptionConst]?.toString(),
+            ),
+          );
+          return;
         }
+
+        // Top-level undiscriminated oneOf/anyOf component handling
+        // If the schema defines a oneOf/anyOf without a discriminator, and all
+        // variants are refs or inline objects, synthesize a union component.
+        if (_getUndiscriminatedUnionValues(value)
+            case final List<dynamic> unionValues) {
+          final description = value[_descriptionConst]?.toString();
+          final union =
+              _createUnionComponentClass(unionValues, key, description);
+          if (union != null) {
+            dataClasses.add(union);
+            return;
+          }
+        }
+
+        if (value.containsKey(_allOfConst)) {
+          for (final map in value[_allOfConst] as List<dynamic>) {
+            if ((map as Map<String, dynamic>).containsKey(_refConst)) {
+              final ref = _formatRef(map);
+
+              refs.add(ref);
+              continue;
+            }
+            if (map.containsKey(_propertiesConst)) {
+              localFindParametersAndImports(map);
+            }
+          }
+        }
+
+        final allOf =
+            refs.isNotEmpty ? (refs: refs, properties: parameters) : null;
+
+        final discriminator = _parseDiscriminatorInfo(value);
         dataClasses.add(
           UniversalComponentClass(
             name: key,
             imports: imports,
-            parameters: parameters,
-            typeDef: true,
+            parameters: allOf != null ? {} : parameters,
+            allOf: allOf,
             description: value[_descriptionConst]?.toString(),
+            discriminator: discriminator,
           ),
         );
-        return;
-      }
-
-      if (value.containsKey(_allOfConst)) {
-        for (final map in value[_allOfConst] as List<dynamic>) {
-          if ((map as Map<String, dynamic>).containsKey(_refConst)) {
-            final ref = _formatRef(map);
-
-            refs.add(ref);
-            continue;
-          }
-          if (map.containsKey(_propertiesConst)) {
-            localFindParametersAndImports(map);
-          }
-        }
-      }
-
-      final allOf =
-          refs.isNotEmpty ? (refs: refs, properties: parameters) : null;
-
-      final discriminator = _parseDiscriminatorInfo(value);
-      dataClasses.add(
-        UniversalComponentClass(
-          name: key,
-          imports: imports,
-          parameters: allOf != null ? {} : parameters,
-          allOf: allOf,
-          description: value[_descriptionConst]?.toString(),
-          discriminator: discriminator,
-        ),
-      );
+      });
     });
 
     dataClasses.addAll(_objectClasses);
@@ -975,19 +1041,42 @@ class OpenApiParser {
       }
     }
 
+    if (config.includeTags.isNotEmpty || config.excludeTags.isNotEmpty) {
+      return _filterUsedClasses(dataClasses);
+    }
+
     return dataClasses;
   }
 
+  /// Filter out unused schemas
+  List<UniversalDataClass> _filterUsedClasses(
+      List<UniversalDataClass> dataClasses) {
+    // Get schemas that are directly used (referenced from included endpoints)
+    final directlyUsedSchemas = _resolveAllDependencies();
+
+    // Get all schemas that should be included (including inline schemas)
+    final allUsedSchemas =
+        _anchorRegistry.resolveAllIncludedSchemas(directlyUsedSchemas);
+
+    // Also include inline schemas that passed the filter
+    final includedInlineSchemas =
+        _anchorRegistry.resolveIncludedInlineSchemas();
+    allUsedSchemas.addAll(includedInlineSchemas);
+
+    final filteredDataClasses = dataClasses.where((dataClass) {
+      return allUsedSchemas.contains(dataClass.name);
+    }).toList();
+
+    return filteredDataClasses;
+  }
+
   /// Get tag for name
-  String _getTag(Map<String, dynamic> map) =>
+  String? _getTag(Map<String, dynamic> map) =>
       config.mergeClients && config.name != null
           ? config.name!
           : map.containsKey(_tagsConst)
-              ? (map[_tagsConst] as List<dynamic>).first.toString().replaceAll(
-                    RegExp(r'[^\w\s]+'),
-                    '',
-                  )
-              : 'client';
+              ? (map[_tagsConst] as List<dynamic>).firstOrNull?.toString()
+              : null;
 
   /// Format `$ref` type
   String _formatRef(Map<String, dynamic> map, {bool useSchema = false}) =>
@@ -996,6 +1085,105 @@ class OpenApiParser {
             ? (map[_schemaConst] as Map<String, dynamic>)[_refConst].toString()
             : map[_refConst].toString(),
       );
+
+  /// Traverse schema structure and call visitor for each $ref found
+  void _traverseSchemaRefs(
+    Map<String, dynamic> map,
+    String? parentSchema,
+    void Function(String refName, String? parent) onRefFound,
+  ) {
+    // Check for direct $ref
+    if (map.containsKey(_refConst)) {
+      final refName = _formatRef(map);
+      onRefFound(refName, parentSchema);
+    }
+
+    // Define schema locations to check
+    final schemaLocations = [
+      (_schemaConst, map[_schemaConst]),
+      (_itemsConst, map[_itemsConst]),
+      (_additionalPropertiesConst, map[_additionalPropertiesConst]),
+    ];
+
+    // Process single schema locations
+    for (final (_, value) in schemaLocations) {
+      if (value is Map<String, dynamic>) {
+        _traverseSchemaRefs(value, parentSchema, onRefFound);
+      }
+    }
+
+    // Process properties object
+    if (map[_propertiesConst] is Map<String, dynamic>) {
+      final properties = map[_propertiesConst] as Map<String, dynamic>;
+      for (final propValue in properties.values) {
+        if (propValue is Map<String, dynamic>) {
+          _traverseSchemaRefs(propValue, parentSchema, onRefFound);
+        }
+      }
+    }
+
+    // Process composition arrays (allOf, oneOf, anyOf)
+    final compositionKeys = [_allOfConst, _oneOfConst, _anyOfConst];
+    for (final key in compositionKeys) {
+      if (map[key] is List) {
+        for (final item in map[key] as List) {
+          if (item is Map<String, dynamic>) {
+            _traverseSchemaRefs(item, parentSchema, onRefFound);
+          }
+        }
+      }
+    }
+  }
+
+  /// Extract schema dependencies without marking them as used
+  void _extractSchemaDependencies(
+      Map<String, dynamic> map, String? parentSchema) {
+    _traverseSchemaRefs(map, parentSchema, (refName, parent) {
+      if (parent != null) {
+        _schemaDependencies.putIfAbsent(parent, () => {}).add(refName);
+      }
+    });
+  }
+
+  /// Extract schema references and mark them as used
+  void _extractSchemaRefs(Map<String, dynamic> map, String? parentSchema) {
+    _traverseSchemaRefs(map, parentSchema, (refName, parent) {
+      _usedSchemas.add(refName);
+      // Also track in the anchor registry if we have a context
+      if (_contextStack.current case final context?) {
+        _anchorRegistry.registerSchemaReference(refName, context);
+      }
+    });
+  }
+
+  /// Resolve all transitive dependencies for used schemas
+  Set<String> _resolveAllDependencies() {
+    final allUsedSchemas = <String>{..._usedSchemas};
+    final visited = <String>{};
+    final toVisit = <String>[..._usedSchemas];
+
+    // Breadth-first search to find all dependencies
+    while (toVisit.isNotEmpty) {
+      final current = toVisit.removeAt(0);
+
+      if (visited.contains(current)) {
+        // Handle circular references
+        continue;
+      }
+
+      visited.add(current);
+
+      final dependencies = _schemaDependencies[current] ?? {};
+      for (final dep in dependencies) {
+        allUsedSchemas.add(dep);
+        if (!visited.contains(dep)) {
+          toVisit.add(dep);
+        }
+      }
+    }
+
+    return allUsedSchemas;
+  }
 
   /// Find type of map
   ({UniversalType type, String? import}) _findType(
@@ -1066,6 +1254,7 @@ class OpenApiParser {
             ...itemDetails.wrappingCollections,
             // If items are themselves collections
           ],
+          deprecated: map[_deprecatedConst].toString().toBool() ?? false,
         ),
         import: itemImport,
       );
@@ -1132,6 +1321,7 @@ class OpenApiParser {
             ...valueDetails.wrappingCollections,
             // If values are themselves collections
           ],
+          deprecated: map[_deprecatedConst].toString().toBool() ?? false,
         ),
         import: valueImport,
       );
@@ -1174,6 +1364,11 @@ class OpenApiParser {
 
       _enumClasses.add(enumClass);
 
+      // Register inline enum in the anchor registry
+      if (_contextStack.current case final context?) {
+        _anchorRegistry.registerInlineSchema(enumClass.name, context);
+      }
+
       final type = map[_typeConst];
       // Determine nullability for enums, considering if "null" is a type or if nullable is true
       var isEnumNullable = map[_nullableConst].toString().toBool() ?? false;
@@ -1197,6 +1392,7 @@ class OpenApiParser {
               (t) => t != 'null',
               orElse: () => map[_typeConst].toString()),
           nullable: isEnumNullable,
+          deprecated: map[_deprecatedConst].toString().toBool() ?? false,
         ),
         import: enumClass.name,
       );
@@ -1248,6 +1444,20 @@ class OpenApiParser {
             parameters: parameters,
           ),
         );
+        // Register inline schema in the anchor registry
+        if (_contextStack.current case final context?) {
+          _anchorRegistry.registerInlineSchema(type, context);
+        }
+        // Track dependencies of inline schemas
+        if (imports.isNotEmpty) {
+          _schemaDependencies[type] = imports.toSet();
+          // Register references from this inline schema
+          if (_contextStack.current case final context?) {
+            for (final imp in imports) {
+              _anchorRegistry.registerInlineSchemaReference(imp, context);
+            }
+          }
+        }
       }
 
       return (
@@ -1262,6 +1472,7 @@ class OpenApiParser {
           defaultValue: protectDefaultValue(map[_defaultConst]),
           nullable: map[_nullableConst].toString().toBool() ?? false,
           isRequired: isRequired,
+          deprecated: map[_deprecatedConst].toString().toBool() ?? false,
         ),
         import: type,
       );
@@ -1314,8 +1525,8 @@ class OpenApiParser {
       }
 
       if (ofList is List<dynamic>) {
-        // Handle first the special case of oneOf with discriminator which should be handled as sealed class
-        if (map.containsKey(_oneOfConst) &&
+        // Handle first the special case of oneOf/anyOf with discriminator which should be handled as sealed class
+        if ((map.containsKey(_oneOfConst) || map.containsKey(_anyOfConst)) &&
             map.containsKey(_discriminatorConst) &&
             (map[_discriminatorConst] as Map<String, dynamic>).containsKey(
               _propertyNameConst,
@@ -1335,9 +1546,10 @@ class OpenApiParser {
           );
 
           // Create a sealed class to represent the discriminated union
+          final sealedClassName = newName!.toPascal;
           _objectClasses.add(
             UniversalComponentClass(
-              name: newName!.toPascal,
+              name: sealedClassName,
               imports: SplayTreeSet<String>(),
               parameters: {
                 UniversalType(
@@ -1349,6 +1561,10 @@ class OpenApiParser {
               discriminator: discriminator,
             ),
           );
+          // Register inline schema in the anchor registry
+          if (_contextStack.current case final context?) {
+            _anchorRegistry.registerInlineSchema(sealedClassName, context);
+          }
 
           ofType = UniversalType(
             type: newName.toPascal,
@@ -1469,9 +1685,10 @@ class OpenApiParser {
                 );
 
                 // Create a class to represent the allOf composition
+                final allOfClassName = newName!.toPascal;
                 _objectClasses.add(
                   UniversalComponentClass(
-                    name: newName!.toPascal,
+                    name: allOfClassName,
                     imports: imports,
                     // ignore: prefer_const_literals_to_create_immutables
                     parameters: {},
@@ -1480,6 +1697,10 @@ class OpenApiParser {
                     description: description,
                   ),
                 );
+                // Register inline schema in the anchor registry
+                if (_contextStack.current case final context?) {
+                  _anchorRegistry.registerInlineSchema(allOfClassName, context);
+                }
 
                 ofType = UniversalType(
                   type: newName.toPascal,
@@ -1492,10 +1713,51 @@ class OpenApiParser {
                     UniversalType(type: _objectConst, isRequired: isRequired);
               }
             } else {
-              // For anyOf or oneOf with multiple non-null types, or type: [type1, type2, "null"]
-              // Default to dynamic or object.
-              ofType =
-                  UniversalType(type: _objectConst, isRequired: isRequired);
+              // For anyOf or oneOf without a discriminator,
+              // we only handle the case when all variants are refs or inline object schemas.
+              final areAllRefsOrObjects =
+                  _getAreAllRefsOrInlineObjects(otherItems);
+
+              final isUnion =
+                  map.containsKey(_oneOfConst) || map.containsKey(_anyOfConst);
+
+              if (areAllRefsOrObjects && isUnion) {
+                final baseClassName =
+                    '${additionalName ?? ''} ${name ?? ''} Union'.toPascal;
+                final (newName, description) = protectName(
+                  baseClassName,
+                  uniqueIfNull: true,
+                  description: map[_descriptionConst]?.toString(),
+                );
+
+                final unionName = newName!.toPascal;
+                final (imports, variantRefToProps) = _getImportsAndProps(
+                  otherItems,
+                  unionName,
+                );
+
+                // Create a union component class marker without discriminator; generators will treat it as a union
+                _objectClasses.add(
+                  UniversalComponentClass(
+                    name: unionName,
+                    imports: imports,
+                    // Parameters here are unused by union factories
+                    parameters: const {},
+                    description: description,
+                    undiscriminatedUnionVariants: variantRefToProps,
+                  ),
+                );
+
+                ofType = UniversalType(
+                  type: unionName,
+                  isRequired: isRequired,
+                );
+                ofImport = unionName;
+              } else {
+                // Fallback if we cannot synthesize a proper union
+                ofType =
+                    UniversalType(type: _objectConst, isRequired: isRequired);
+              }
             }
           }
 
@@ -1520,6 +1782,7 @@ class OpenApiParser {
             isRequired: isRequired,
             nullable: map[_nullableConst].toString().toBool() ??
                 (root && !isRequired),
+            deprecated: map[_deprecatedConst].toString().toBool() ?? false,
           );
         }
 
@@ -1580,6 +1843,7 @@ class OpenApiParser {
           // isRequired for the property itself
           wrappingCollections: finalWrappingCollections,
           nullable: finalNullable,
+          deprecated: ofType?.deprecated ?? false,
         ),
         import: finalImport,
       );
@@ -1633,26 +1897,92 @@ class OpenApiParser {
           enumType: enumType,
           isRequired: isRequired,
           nullable: map[_nullableConst].toString().toBool() ?? false,
+          deprecated: map[_deprecatedConst].toString().toBool() ?? false,
         ),
         import: import,
       );
     }
   }
 
+  bool _getAreAllRefsOrInlineObjects(List<Map<String, dynamic>> otherItems) {
+    // Avoid strict pattern matching on YAML-backed maps because values may be
+    // YamlScalar/other runtime types. Use defensive .toString() comparisons.
+    return otherItems.every((item) {
+      final hasRef = item.containsKey(_refConst);
+      final properties = item[_propertiesConst];
+      final hasProps =
+          properties is Map<String, dynamic> && properties.isNotEmpty;
+      final hasExplicitObjectType =
+          item[_typeConst]?.toString() == _objectConst;
+
+      // Accept either a $ref, an inline object with explicit type: object,
+      // or an inline object with properties and no explicit type.
+      return hasRef ||
+          (hasExplicitObjectType && hasProps) ||
+          (hasProps && !item.containsKey(_typeConst));
+    });
+  }
+
+  /// Check if a path is included or excluded based on its tags and
+  /// [ParserConfig.includeTags] and [ParserConfig.excludeTags].
+  ///
+  /// If [ParserConfig.includeTags] is not empty,
+  /// [ParserConfig.excludeTags] will be ignored.
+  ///
+  /// If both are empty, the path will always be included.
+  bool _isPathIncluded(Map<String, dynamic> requestPath) {
+    final tags = switch (requestPath[_tagsConst]) {
+      final List<dynamic> tags => tags.map((tag) => tag as String).toList(),
+      _ => <String>[],
+    };
+
+    if (config.includeTags.isNotEmpty) {
+      return config.includeTags.any(tags.contains);
+    }
+
+    if (config.excludeTags.isNotEmpty) {
+      return config.excludeTags.none(tags.contains);
+    }
+
+    // If neither includeTags nor excludeTags is specified, include everything
+    return true;
+  }
+
   Discriminator? _parseDiscriminatorInfo(Map<String, dynamic> map) {
-    if (!map.containsKey(_oneOfConst)) {
+    // Only consider discriminator information when adjacent to oneOf or anyOf
+    if (!map.containsKey(_oneOfConst) && !map.containsKey(_anyOfConst)) {
       return null;
     }
-    final discriminator = map[_discriminatorConst] as Map<String, dynamic>;
-    final propertyName = discriminator[_propertyNameConst] as String;
-    final refMapping = discriminator[_mappingConst] as Map<String, dynamic>;
+
+    // Must have a discriminator object
+    if (!map.containsKey(_discriminatorConst)) {
+      return null;
+    }
+    final discriminatorRaw = map[_discriminatorConst];
+    if (discriminatorRaw is! Map<String, dynamic>) {
+      return null;
+    }
+
+    // Discriminator must have both propertyName and mapping
+    if (!discriminatorRaw.containsKey(_propertyNameConst) ||
+        !discriminatorRaw.containsKey(_mappingConst)) {
+      return null;
+    }
+
+    final propertyName = discriminatorRaw[_propertyNameConst] as String;
+    final refMappingRaw = discriminatorRaw[_mappingConst];
+    if (refMappingRaw is! Map) {
+      return null;
+    }
 
     // Cleanup the refMapping to contain only the class name
     final cleanedRefMapping = <String, String>{};
-    for (final key in refMapping.keys) {
-      final refMap = <String, dynamic>{_refConst: refMapping[key]};
+    for (final entry in refMappingRaw.entries) {
+      final key = entry.key.toString();
+      final refMap = <String, dynamic>{_refConst: entry.value};
       cleanedRefMapping[key] = _formatRef(refMap);
     }
+
     return (
       propertyName: propertyName,
       discriminatorValueToRefMapping: cleanedRefMapping,
@@ -1660,6 +1990,101 @@ class OpenApiParser {
       refProperties: <String, Set<UniversalType>>{},
     );
   }
+
+  (
+    SplayTreeSet<String> imports,
+    Map<String, Set<UniversalType>> variantRefToProps
+  ) _getImportsAndProps(
+    List<Map<String, dynamic>> otherItems,
+    String unionName,
+  ) {
+    // Gather properties for each variant to be exposed on union constructors
+    // and collect imports for referenced schemas.
+    final imports = SplayTreeSet<String>();
+    final variantRefToProps = <String, Set<UniversalType>>{};
+
+    for (final item in otherItems) {
+      if (item.containsKey(_refConst)) {
+        final refName = _formatRef(item).toPascal;
+
+        // Locate the referenced component to get its properties if available.
+        if (_definitionFileContent
+            case {
+              _componentsConst: {
+                _schemasConst: final Map<String, dynamic> schemas,
+              }
+            } when schemas[refName] is Map<String, dynamic>) {
+          final schemaMap = schemas[refName] as Map<String, dynamic>;
+          final (props, propImports) = _findParametersAndImports(
+            schemaMap,
+            additionalName: refName,
+          );
+          variantRefToProps[refName] = props;
+          imports.addAll(propImports);
+        }
+      } else {
+        // Inline object variant; synthesize a stable variant key based on index only
+        // so factories are named `variant<idx>` and classes `${unionName}Variant<idx>`.
+        final idx = otherItems.indexOf(item) + 1;
+        final variantKey = 'variant$idx';
+        final (props, propImports) = _findParametersAndImports(
+          item,
+          additionalName: '${unionName}Variant$idx',
+        );
+        imports.addAll(propImports);
+        variantRefToProps[variantKey] = props;
+      }
+    }
+
+    return (imports, variantRefToProps);
+  }
+
+  /// Returns the union values if the schema is an undiscriminated union, otherwise null.
+  List<dynamic>? _getUndiscriminatedUnionValues(Map<String, dynamic> value) {
+    final ofList = value[_oneOfConst] ?? value[_anyOfConst];
+    if (ofList is! List) {
+      return null;
+    }
+    if (value[_discriminatorConst] is Map<String, dynamic>) {
+      return null;
+    }
+    return ofList;
+  }
+
+  UniversalComponentClass? _createUnionComponentClass(
+      List<dynamic> values, String schemaName, String? unionDescription) {
+    final unionVariants = filterNullTypes(values);
+    if (!_getAreAllRefsOrInlineObjects(unionVariants)) {
+      return null;
+    }
+
+    final baseClassName = '$schemaName Union'.toPascal;
+    final (newName, description) = protectName(
+      baseClassName,
+      uniqueIfNull: true,
+      description: unionDescription,
+    );
+    final unionName = newName!.toPascal;
+    final (foundImports, variantRefToProps) = _getImportsAndProps(
+      unionVariants,
+      unionName,
+    );
+
+    return UniversalComponentClass(
+      name: unionName,
+      imports: foundImports,
+      parameters: const {},
+      description: description,
+      undiscriminatedUnionVariants: variantRefToProps,
+    );
+  }
+
+  List<Map<String, dynamic>> filterNullTypes(List<dynamic> values) => values
+      .whereType<Map<String, dynamic>>()
+      .where((item) =>
+          // filter out explicit null variants if present
+          item[_typeConst]?.toString() != 'null')
+      .toList();
 }
 
 /// Extension used for [YamlMap]

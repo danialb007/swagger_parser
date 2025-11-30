@@ -1,5 +1,6 @@
+import '../generator/model/programming_language.dart';
+import '../parser/model/normalized_identifier.dart';
 import '../parser/swagger_parser_core.dart';
-import '../parser/utils/case_utils.dart';
 import 'type_utils.dart';
 
 /// Provides imports as String from list of imports
@@ -68,14 +69,11 @@ String formatNumber(int number) => number.toString().replaceAllMapped(
     );
 
 String generatedFileComment({
-  required bool markFileAsGenerated,
-  bool ignoreLints = true,
+  required ProgrammingLanguage language,
 }) =>
-    markFileAsGenerated
-        ? ignoreLints
-            ? '$_generatedCodeComment$_ignoreLintsComment\n'
-            : '$_generatedCodeComment\n'
-        : '';
+    language == ProgrammingLanguage.dart
+        ? '$_generatedCodeComment$_ignoreLintsComment\n'
+        : '$_generatedCodeComment\n';
 
 const _generatedCodeComment = '''
 // coverage:ignore-file
@@ -83,5 +81,5 @@ const _generatedCodeComment = '''
 ''';
 
 const _ignoreLintsComment = '''
-// ignore_for_file: type=lint, unused_import
+// ignore_for_file: type=lint, unused_import, invalid_annotation_target, unnecessary_import
 ''';

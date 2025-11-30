@@ -1,16 +1,13 @@
+import '../../parser/model/normalized_identifier.dart';
 import '../../parser/swagger_parser_core.dart';
-import '../../parser/utils/case_utils.dart';
 import '../../utils/base_utils.dart';
 import '../../utils/type_utils.dart';
 import '../model/programming_language.dart';
 
 /// Provides template for generating kotlin DTO using Moshi
-String kotlinMoshiDtoTemplate(
-  UniversalComponentClass dataClass, {
-  required bool markFileAsGenerated,
-}) {
+String kotlinMoshiDtoTemplate(UniversalComponentClass dataClass) {
   return '''
-${generatedFileComment(markFileAsGenerated: markFileAsGenerated, ignoreLints: false)}import com.squareup.moshi.Json
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 ${descriptionComment(dataClass.description)}@JsonClass(generateAdapter = true)
