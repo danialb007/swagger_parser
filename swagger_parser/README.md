@@ -31,19 +31,19 @@ In your pubspec.yaml, add the following dependencies:
 
 ```yaml
 dependencies:
-  # dart_mappable: ^4.6.0 # for dart_mappable
+  # dart_mappable: ^4.6.1 # for dart_mappable
   # dio: ^5.9.0
   # freezed_annotation: ^3.1.0 # for freezed
   # json_annotation: ^4.9.0
-  # retrofit: ^4.7.1
+  # retrofit: ^4.9.0
 
 dev_dependencies:
-  # build_runner: ^2.7.0
+  # build_runner: ^2.9.0
   # carapacik_lints: ^1.13.0
-  # dart_mappable_builder: ^4.6.0 # for dart_mappable
-  # freezed: ^3.2.0 # for freezed
-  # json_serializable: ^6.10.0
-  # retrofit_generator: ^10.0.2
+  # dart_mappable_builder: ^4.6.1 # for dart_mappable
+  # freezed: ^3.2.3 # for freezed
+  # json_serializable: ^6.11.1
+  # retrofit_generator: ^10.0.6
   swagger_parser:
 ```
 
@@ -148,12 +148,18 @@ swagger_parser:
   # Set 'false' to maintain compatibility with Freezed 2.x.
   use_freezed3: false
 
-  # Optional (dart & freezed only). Set string value to use fallbackUnion parameter when using Freezed annotation.
-  # When set to a string value, adds fallbackUnion: <value> to the @Freezed annotation.
-  # When not set (null) or empty, the @Freezed annotation has no fallbackUnion parameter.
+  # Optional (dart & freezed/dart_mappable). Set string value to use fallbackUnion parameter.
+  # For freezed: adds fallbackUnion: <value> to the @Freezed annotation.
+  # For dart_mappable: creates additional fallback variant for unknown discriminator values.
+  # When not set (null) or empty, no fallback union is generated.
   # Examples: "unknown"
   # Default: "" (no fallbackUnion parameter)
   fallback_union: ""
+
+  # Optional (dart_mappable only). Set false to generate sealed classes for union types.
+  # Set true to generate when/maybeWhen convenience methods for legacy support of deprecated union features from versions prior to 3.31.
+  # Default: false
+  dart_mappable_convenient_when: false
 
   # DART ONLY
   # Optional. Set `true` to use MultipartFile instead of File as argument type for file parameters.
@@ -189,6 +195,19 @@ swagger_parser:
   # This is useful when using swagger_parser together with build_runner, which needs to map
   # input files to output files 1-to-1.
   merge_outputs: false
+
+  # DART ONLY
+  # Optional. Set `true` to generate includeIfNull annotations for nullable fields.
+  # If set to `false`, includeIfNull annotations will not be generated.
+  include_if_null: false
+
+  # DART ONLY
+  # Optional. Set `true` to infer required properties from nullability.
+  # When enabled and the schema has no explicit required array:
+  # - Properties without nullable: true are marked as required
+  # - Properties with nullable: true remain optional
+  # If the schema defines a required array, this option has no effect.
+  infer_required_from_nullable: false
 ```
 
 For multiple schemes:
@@ -257,7 +276,7 @@ If you name your configuration file something other than `swagger_parser.yaml` o
 you will need to specify the name of the YAML file as an argument.
 
 ```shell
-dart run swagger parser -f <path to your config file>
+dart run swagger_parser -f <path to your config file>
 ```
 
 #### Output directory argument

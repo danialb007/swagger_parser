@@ -1,10 +1,9 @@
 import 'package:collection/collection.dart';
-
-import '../../parser/model/normalized_identifier.dart';
-import '../../parser/swagger_parser_core.dart';
-import '../../utils/base_utils.dart';
-import '../model/json_serializer.dart';
-import 'dart_import_dto_template.dart';
+import 'package:swagger_parser/src/generator/model/json_serializer.dart';
+import 'package:swagger_parser/src/generator/templates/dart_import_dto_template.dart';
+import 'package:swagger_parser/src/parser/model/normalized_identifier.dart';
+import 'package:swagger_parser/src/parser/swagger_parser_core.dart';
+import 'package:swagger_parser/src/utils/base_utils.dart';
 
 /// Provides template for generating dart enum DTO
 String dartEnumDtoTemplate(
@@ -59,7 +58,12 @@ String _dartEnumDartMappableTemplate(
 
   final values = [
     ...enumClass.items,
-    if (unknownEnumValue)
+    if (unknownEnumValue &&
+        !enumClass.items.any(
+          (item) =>
+              item.name.toLowerCase() == 'unknown' ||
+              item.jsonKey.toLowerCase() == 'unknown',
+        ))
       const UniversalEnumItem(name: 'unknown', jsonKey: 'unknown'),
   ]
       .mapIndexed(
@@ -175,7 +179,7 @@ String _toJson(UniversalEnumClass enumClass, String className) {
 }
 
 String _toString() =>
-    '\n\n  @override\n  String toString() => json ?? super.toString();';
+    '\n\n  @override\n  String toString() => json?.toString() ?? super.toString();';
 
 String _toStringDartMappable() =>
     '\n\n  @override\n  String toString() => toValue().toString();\n';

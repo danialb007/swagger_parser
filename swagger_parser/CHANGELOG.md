@@ -1,3 +1,49 @@
+## 1.35.2
+- Fix enum name values being a int returned in a toString
+
+## 1.35.1
+- Fixed enum names generation
+
+## 1.35.0
+- Add `infer_required_from_nullable`
+```
+infer_required_from_nullable: true
+
+Schema without required array:
+- id: type: integer → required int id
+- name: type: string → required String name
+- desc: type: string, nullable: true → String? desc
+```
+- Fix nullable array item types generation
+
+## 1.34.0
+- includeIfNull handling, turned off by default, use include_if_null=true to enable
+
+## 1.33.0
+- Support correct processing of nested allOf classes
+
+## 1.32.1
+- Fix CHANGELOG duplication
+
+## 1.32.0
+- Add complete sealed classes(`oneOf`/`anyOf`) support for `json_serializeble` serializer
+  - **WARNING**: Undiscriminated sealed classes use O(n) try-catch deserialization where n is the number of variants
+  - **RECOMMENDED**: Add discriminator properties to your OpenAPI specification for O(1) performance
+  - Add support for sealed classes fallback for failed decoding
+- Add complete sealed classes(`oneOf`/`anyOf`) support for `dart_mappable` serializer
+  - **WARNING**: Undiscriminated sealed classes use O(n) try-catch deserialization where n is the number of variants
+  - **RECOMMENDED**: Add discriminator properties to your OpenAPI specification for O(1) performance
+  - Add support for sealed classes fallback for failed decoding
+- Add `dart_mappable_convenient_when` option to control union type generation for `dart_mappable` serializer
+  - `dart_mappable_convenient_when: true` - generates legacy `when<T>, maybeWhen<T>` methods
+  - `dart_mappable_convenient_when: false` (default) - generates sealed classes for better type safety
+- Add `@Deprecated()` annotation to `when<T>, maybeWhen<T>` method with dart_mappable. Use dart pattern matching
+- Fix creating duplicated `unknown` property enum with dart_mappable and `unknown_enum_value: true`
+- Fix for handle nullable discriminator unions properly
+
+## 1.30.1
+- Fix resolve inline schemas nested within tagged operations
+
 ## 1.30.0
 - Add support for merging all generated code into single output file using the `merge_outputs` option
 

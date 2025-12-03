@@ -3,23 +3,22 @@ import 'dart:io';
 
 import 'package:collection/collection.dart';
 import 'package:path/path.dart' as p;
+import 'package:swagger_parser/src/parser/config/parser_config.dart';
+import 'package:swagger_parser/src/parser/corrector/open_api_corrector.dart';
+import 'package:swagger_parser/src/parser/exception/open_api_parser_exception.dart';
+import 'package:swagger_parser/src/parser/model/normalized_identifier.dart';
+import 'package:swagger_parser/src/parser/model/open_api_info.dart';
+import 'package:swagger_parser/src/parser/model/universal_collections.dart';
+import 'package:swagger_parser/src/parser/model/universal_data_class.dart';
+import 'package:swagger_parser/src/parser/model/universal_request.dart';
+import 'package:swagger_parser/src/parser/model/universal_request_type.dart';
+import 'package:swagger_parser/src/parser/model/universal_rest_client.dart';
+import 'package:swagger_parser/src/parser/model/universal_type.dart';
+import 'package:swagger_parser/src/parser/utils/anchor_registry.dart';
+import 'package:swagger_parser/src/parser/utils/context_stack.dart';
+import 'package:swagger_parser/src/parser/utils/http_utils.dart';
+import 'package:swagger_parser/src/parser/utils/type_utils.dart';
 import 'package:yaml/yaml.dart';
-
-import '../config/parser_config.dart';
-import '../corrector/open_api_corrector.dart';
-import '../exception/open_api_parser_exception.dart';
-import '../model/normalized_identifier.dart';
-import '../model/open_api_info.dart';
-import '../model/universal_collections.dart';
-import '../model/universal_data_class.dart';
-import '../model/universal_request.dart';
-import '../model/universal_request_type.dart';
-import '../model/universal_rest_client.dart';
-import '../model/universal_type.dart';
-import '../utils/anchor_registry.dart';
-import '../utils/context_stack.dart';
-import '../utils/http_utils.dart';
-import '../utils/type_utils.dart';
 
 /// General class for parsing OpenApi specification into universal models
 class OpenApiParser {
@@ -759,7 +758,16 @@ class OpenApiParser {
               _ => false,
             };
 
-        final isRequired = requiredParameters.contains(propertyName);
+        var isRequired = requiredParameters.contains(propertyName);
+        // If inferRequiredFromNullable is enabled and there's no required array,
+        // infer required from nullability
+        if (!isRequired &&
+            config.inferRequiredFromNullable &&
+            requiredParameters.isEmpty &&
+            !hasDefaultKey &&
+            !isNullable) {
+          isRequired = true;
+        }
         final typeWithImport = _findType(
           propertyValue,
           name: propertyName,
@@ -863,7 +871,7 @@ class OpenApiParser {
           final values = (value[_enumConst] as List).map((e) => '$e');
           if (value.containsKey(_enumNamesConst)) {
             final names = (value[_enumNamesConst] as List).map((e) => '$e');
-            items = protectEnumItemsNamesAndValues(names, values);
+            items = protectEnumItemsNames(names, values: values);
           } else {
             items = protectEnumItemsNames(values);
           }
@@ -954,14 +962,41 @@ class OpenApiParser {
     _enumClasses.clear();
 
     // check for `allOf`
-    final allOfClasses = dataClasses.where(
-      (dc) => dc is UniversalComponentClass && dc.allOf != null,
-    );
-    for (final allOfClass in allOfClasses) {
-      if (allOfClass is! UniversalComponentClass) {
-        continue;
+    // Process allOf classes in topological order (resolve dependencies first)
+    final allOfClasses = dataClasses
+        .where(
+          (dc) => dc is UniversalComponentClass && dc.allOf != null,
+        )
+        .cast<UniversalComponentClass>()
+        .toList();
+
+    // Build a map of class names to classes for quick lookup
+    final classMap = <String, UniversalDataClass>{};
+    for (final dc in dataClasses) {
+      classMap[dc.name] = dc;
+    }
+
+    // Track which classes have been resolved
+    final resolved = <String>{};
+
+    // Recursive function to resolve allOf for a class
+    void resolveAllOf(UniversalComponentClass allOfClass) {
+      // If already resolved, skip
+      if (resolved.contains(allOfClass.name)) {
+        return;
       }
+
       final refs = allOfClass.allOf!.refs;
+
+      // First, resolve all referenced classes recursively
+      for (final ref in refs) {
+        final refClass = classMap[ref];
+        if (refClass is UniversalComponentClass && refClass.allOf != null) {
+          resolveAllOf(refClass);
+        }
+      }
+
+      // Now collect parameters from resolved references
       final foundClasses = dataClasses.where((e) => refs.contains(e.name));
       // allOf could be stack of different refs and properties
       // there is some chance that combined props will overlap by name
@@ -1003,6 +1038,12 @@ class OpenApiParser {
       }
 
       allOfClass.parameters.addAll(parameters.values);
+      resolved.add(allOfClass.name);
+    }
+
+    // Resolve all allOf classes
+    for (final allOfClass in allOfClasses) {
+      resolveAllOf(allOfClass);
     }
 
     // check for discriminated oneOf
@@ -1079,12 +1120,13 @@ class OpenApiParser {
               : null;
 
   /// Format `$ref` type
-  String _formatRef(Map<String, dynamic> map, {bool useSchema = false}) =>
-      p.basename(
-        useSchema
-            ? (map[_schemaConst] as Map<String, dynamic>)[_refConst].toString()
-            : map[_refConst].toString(),
-      );
+  String _formatRef(Map<String, dynamic> map, {bool useSchema = false}) {
+    return p.basename(
+      useSchema
+          ? (map[_schemaConst] as Map<String, dynamic>)[_refConst].toString()
+          : map[_refConst].toString(),
+    );
+  }
 
   /// Traverse schema structure and call visitor for each $ref found
   void _traverseSchemaRefs(
@@ -1349,7 +1391,7 @@ class OpenApiParser {
       final values = (map[_enumConst] as List).map((e) => '$e');
       if (map.containsKey(_enumNamesConst)) {
         final names = (map[_enumNamesConst] as List).map((e) => '$e');
-        items = protectEnumItemsNamesAndValues(names, values);
+        items = protectEnumItemsNames(names, values: values);
       } else {
         items = protectEnumItemsNames(values);
       }
@@ -1569,6 +1611,7 @@ class OpenApiParser {
           ofType = UniversalType(
             type: newName.toPascal,
             isRequired: isRequired,
+            nullable: map[_nullableConst].toString().toBool() ?? false,
             // Nullability for ofType will be determined later by nullItems check
           );
           ofImport = newName.toPascal;
@@ -1621,8 +1664,23 @@ class OpenApiParser {
             // Here, `map` is the `anyOf` schema. `optionalItem` is the array schema.
             // We need to preserve context like `items` if it's outside `anyOf` but part of the same definition.
 
+            final mergedOptionalItem = Map<String, dynamic>.from(optionalItem);
+            const keysToSkip = {
+              _typeConst,
+              _oneOfConst,
+              _anyOfConst,
+              _allOfConst,
+              _nullableConst,
+            };
+            for (final entry in map.entries) {
+              if (keysToSkip.contains(entry.key)) {
+                continue;
+              }
+              mergedOptionalItem.putIfAbsent(entry.key, () => entry.value);
+            }
+
             final (:type, :import) = _findType(
-              optionalItem,
+              mergedOptionalItem,
               root: root,
               // Pass root along
               // If nullItems is present, this type is effectively not required at this level of anyOf,
@@ -1774,8 +1832,8 @@ class OpenApiParser {
             ofList.every((item) =>
                 item is Map<String, dynamic> &&
                 item[_typeConst]?.toString() == 'null')) {
-          ofType = UniversalType(
-              type: _objectConst, isRequired: isRequired, nullable: true);
+          ofType = const UniversalType(
+              type: _objectConst, isRequired: false, nullable: true);
         } else {
           ofType ??= UniversalType(
             type: _objectConst,
@@ -1883,6 +1941,28 @@ class OpenApiParser {
 
       final enumType = defaultValue != null && import != null ? type : null;
 
+      // For $ref types, check the referenced schema for nullable property
+      var referencedNullable = false;
+      var deprecated = map[_deprecatedConst].toString().toBool() ?? false;
+      if (map.containsKey(_refConst)) {
+        final refName = _formatRef(map);
+        if (_definitionFileContent.containsKey(_componentsConst)) {
+          final components =
+              _definitionFileContent[_componentsConst] as Map<String, dynamic>;
+          if (components.containsKey(_schemasConst)) {
+            final schemas = components[_schemasConst] as Map<String, dynamic>;
+            if (schemas.containsKey(refName)) {
+              final referencedSchema = schemas[refName] as Map<String, dynamic>;
+              referencedNullable =
+                  referencedSchema[_nullableConst].toString().toBool() ?? false;
+              deprecated =
+                  referencedSchema[_deprecatedConst].toString().toBool() ??
+                      false;
+            }
+          }
+        }
+      }
+
       return (
         type: UniversalType(
           type: type,
@@ -1932,16 +2012,23 @@ class OpenApiParser {
   /// If both are empty, the path will always be included.
   bool _isPathIncluded(Map<String, dynamic> requestPath) {
     final tags = switch (requestPath[_tagsConst]) {
-      final List<dynamic> tags => tags.map((tag) => tag as String).toList(),
+      final List<dynamic> tags => tags
+          .map((tag) => tag as String)
+          .map((tag) => tag.toLowerCase())
+          .toList(),
       _ => <String>[],
     };
 
     if (config.includeTags.isNotEmpty) {
-      return config.includeTags.any(tags.contains);
+      return config.includeTags
+          .map((tag) => tag.toLowerCase())
+          .any(tags.contains);
     }
 
     if (config.excludeTags.isNotEmpty) {
-      return config.excludeTags.none(tags.contains);
+      return config.excludeTags
+          .map((tag) => tag.toLowerCase())
+          .none(tags.contains);
     }
 
     // If neither includeTags nor excludeTags is specified, include everything

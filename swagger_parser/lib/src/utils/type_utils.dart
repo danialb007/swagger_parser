@@ -1,5 +1,5 @@
-import '../generator/model/programming_language.dart';
-import '../parser/swagger_parser_core.dart';
+import 'package:swagger_parser/src/generator/model/programming_language.dart';
+import 'package:swagger_parser/src/parser/swagger_parser_core.dart';
 
 final _fileTypeRegExp = RegExp(r'\bFile\b');
 
@@ -47,7 +47,7 @@ extension UniversalTypeX on UniversalType {
     } else {
       // If it's not a collection, the type's nullability is determined by
       // UniversalType.nullable and whether it has a default value.
-      if (nullable) {
+      if (nullable || referencedNullable) {
         addQuestionMarkToBaseTypeName = true;
       }
     }

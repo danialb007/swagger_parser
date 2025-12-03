@@ -1,6 +1,6 @@
-import '../../parser/model/replacement_rule.dart';
-import '../model/json_serializer.dart';
-import '../model/programming_language.dart';
+import 'package:swagger_parser/src/generator/model/json_serializer.dart';
+import 'package:swagger_parser/src/generator/model/programming_language.dart';
+import 'package:swagger_parser/src/parser/model/replacement_rule.dart';
 
 /// The configuration that the Generator uses
 class GeneratorConfig {
@@ -27,7 +27,9 @@ class GeneratorConfig {
     this.useFreezed3 = false,
     this.useMultipartFile = false,
     this.fallbackUnion,
+    this.dartMappableConvenientWhen = true,
     this.mergeOutputs = false,
+    this.includeIfNull = false,
   });
 
   /// Optional. Set API name for folder and export file or merged output file
@@ -126,9 +128,19 @@ class GeneratorConfig {
   /// Optional. Set fallback constructor name to use fallbackUnion parameter when using Freezed annotation.
   final String? fallbackUnion;
 
+  /// DART ONLY
+  /// Optional. Set 'true' to generate when/maybeWhen convenience methods for dart_mappable unions.
+  /// Set 'false' to use only native Dart pattern matching.
+  final bool dartMappableConvenientWhen;
+
   /// Optional. Set to true to merge all generated code into a single file.
   ///
   /// This is useful when using swagger_parser together with build_runner, which needs to map
   /// input files to output files 1-to-1.
   final bool mergeOutputs;
+
+  /// DART ONLY
+  /// Optional. Set `true` to generate includeIfNull annotations for nullable fields.
+  /// If set to `false`, includeIfNull annotations will not be generated.
+  final bool includeIfNull;
 }

@@ -1,9 +1,10 @@
-import '../../parser/model/normalized_identifier.dart';
-import '../../parser/swagger_parser_core.dart';
-import '../../utils/base_utils.dart';
-import '../config/generator_config.dart';
-import '../model/generated_file.dart';
-import '../model/programming_language.dart';
+import 'package:swagger_parser/src/generator/config/generator_config.dart';
+import 'package:swagger_parser/src/generator/model/generated_file.dart';
+import 'package:swagger_parser/src/generator/model/json_serializer.dart';
+import 'package:swagger_parser/src/generator/model/programming_language.dart';
+import 'package:swagger_parser/src/parser/model/normalized_identifier.dart';
+import 'package:swagger_parser/src/parser/swagger_parser_core.dart';
+import 'package:swagger_parser/src/utils/base_utils.dart';
 
 /// Handles generating files
 final class FillController {
@@ -21,9 +22,8 @@ final class FillController {
 
   /// Return [GeneratedFile] generated from given [UniversalDataClass]
   GeneratedFile fillDtoContent(UniversalDataClass dataClass) => GeneratedFile(
-        name: 'models/'
-            '${config.language == ProgrammingLanguage.dart ? dataClass.name.toSnake : dataClass.name.toPascal}'
-            '.${config.language.fileExtension}',
+        name:
+            'models/${_resolveDtoFileBaseName(dataClass)}.${config.language.fileExtension}',
         content: config.language.dtoFileContent(
           dataClass,
           jsonSerializer: config.jsonSerializer,
@@ -33,9 +33,45 @@ final class FillController {
           generateValidator: config.generateValidator,
           useFreezed3: config.useFreezed3,
           useMultipartFile: config.useMultipartFile,
+          dartMappableConvenientWhen: config.dartMappableConvenientWhen,
+          includeIfNull: config.includeIfNull,
           fallbackUnion: config.fallbackUnion,
         ),
       );
+
+  String _resolveDtoFileBaseName(UniversalDataClass dataClass) {
+    if (config.language != ProgrammingLanguage.dart) {
+      return dataClass.name.toPascal;
+    }
+
+    var baseName = dataClass.name;
+
+    if (config.jsonSerializer != JsonSerializer.freezed &&
+        dataClass is UniversalComponentClass) {
+      final isUnion = dataClass.discriminator != null ||
+          (dataClass.undiscriminatedUnionVariants?.isNotEmpty ?? false);
+      if (isUnion) {
+        baseName = _applySealedNaming(baseName);
+      }
+    }
+
+    return baseName.toSnake;
+  }
+
+  String _applySealedNaming(String name) {
+    const unionSuffix = 'Union';
+    const sealedSuffix = 'Sealed';
+
+    if (name.endsWith(sealedSuffix)) {
+      return name;
+    }
+
+    if (name.endsWith(unionSuffix)) {
+      return '${name.substring(0, name.length - unionSuffix.length)}$sealedSuffix';
+    }
+
+    return name;
+  }
 
   /// Return [GeneratedFile] generated from given [UniversalRestClient]
   GeneratedFile fillRestClientContent(UniversalRestClient restClient) {

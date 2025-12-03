@@ -1,11 +1,10 @@
 import 'package:args/args.dart';
+import 'package:swagger_parser/src/config/config_exception.dart';
+import 'package:swagger_parser/src/generator/config/generator_config.dart';
+import 'package:swagger_parser/src/generator/model/json_serializer.dart';
+import 'package:swagger_parser/src/generator/model/programming_language.dart';
+import 'package:swagger_parser/src/parser/swagger_parser_core.dart';
 import 'package:yaml/yaml.dart';
-
-import '../generator/config/generator_config.dart';
-import '../generator/model/json_serializer.dart';
-import '../generator/model/programming_language.dart';
-import '../parser/swagger_parser_core.dart';
-import 'config_exception.dart';
 
 /// Swagger Parser Config
 class SWPConfig {
@@ -39,10 +38,13 @@ class SWPConfig {
     this.useFreezed3 = false,
     this.useMultipartFile = false,
     this.fallbackUnion,
+    this.dartMappableConvenientWhen = false,
     this.excludeTags = const <String>[],
     this.includeTags = const <String>[],
     this.fallbackClient = 'fallback',
     this.mergeOutputs = false,
+    this.includeIfNull = false,
+    this.inferRequiredFromNullable = false,
   });
 
   /// Internal constructor of [SWPConfig]
@@ -78,6 +80,9 @@ class SWPConfig {
     required this.includeTags,
     required this.fallbackClient,
     required this.mergeOutputs,
+    required this.dartMappableConvenientWhen,
+    required this.includeIfNull,
+    required this.inferRequiredFromNullable,
     this.fallbackUnion,
   });
 
@@ -233,6 +238,11 @@ class SWPConfig {
     final fallbackUnion =
         yamlMap['fallback_union'] as String? ?? rootConfig?.fallbackUnion;
 
+    final dartMappableConvenientWhen =
+        yamlMap['dart_mappable_convenient_when'] as bool? ??
+            rootConfig?.dartMappableConvenientWhen ??
+            true;
+
     final excludedTagsYaml = yamlMap['exclude_tags'] as YamlList?;
     List<String>? excludedTags;
     if (excludedTagsYaml != null) {
@@ -270,6 +280,13 @@ class SWPConfig {
 
     final mergeOutputs =
         yamlMap['merge_outputs'] as bool? ?? rootConfig?.mergeOutputs;
+
+    final includeIfNull =
+        yamlMap['include_if_null'] as bool? ?? rootConfig?.includeIfNull;
+
+    final inferRequiredFromNullable =
+        yamlMap['infer_required_from_nullable'] as bool? ??
+            rootConfig?.inferRequiredFromNullable;
 
     // Default config
     final dc = SWPConfig(name: name, outputDirectory: outputDirectory);
@@ -309,6 +326,10 @@ class SWPConfig {
       includeTags: includedTags ?? dc.includeTags,
       fallbackClient: fallbackClient ?? dc.fallbackClient,
       mergeOutputs: mergeOutputs ?? dc.mergeOutputs,
+      dartMappableConvenientWhen: dartMappableConvenientWhen,
+      includeIfNull: includeIfNull ?? dc.includeIfNull,
+      inferRequiredFromNullable:
+          inferRequiredFromNullable ?? dc.inferRequiredFromNullable,
     );
   }
 
@@ -459,6 +480,11 @@ class SWPConfig {
   final String? fallbackUnion;
 
   /// DART ONLY
+  /// Optional. Set 'true' to generate when/maybeWhen convenience methods for dart_mappable unions.
+  /// Set 'false' to use only native Dart pattern matching.
+  final bool dartMappableConvenientWhen;
+
+  /// DART ONLY
   /// Optional. Set excluded tags.
   ///
   /// Endpoints with these tags will not be included in the generated clients.
@@ -482,6 +508,17 @@ class SWPConfig {
   /// This is useful when using swagger_parser together with build_runner, which needs to map
   /// input files to output files 1-to-1.
   final bool mergeOutputs;
+
+  /// DART ONLY
+  /// Optional. Set `true` to generate includeIfNull annotations for nullable fields.
+  /// If set to `false`, includeIfNull annotations will not be generated.
+  final bool includeIfNull;
+
+  /// DART ONLY
+  /// Optional. When true, infer required properties from nullability.
+  /// Properties without nullable: true in schema are marked as required.
+  /// Only applies when schema has no explicit required array.
+  final bool inferRequiredFromNullable;
 
   /// Convert [SWPConfig] to [GeneratorConfig]
   GeneratorConfig toGeneratorConfig() {
@@ -507,7 +544,9 @@ class SWPConfig {
       useFreezed3: useFreezed3,
       useMultipartFile: useMultipartFile,
       fallbackUnion: fallbackUnion,
+      dartMappableConvenientWhen: dartMappableConvenientWhen,
       mergeOutputs: mergeOutputs,
+      includeIfNull: includeIfNull,
     );
   }
 
@@ -530,6 +569,7 @@ class SWPConfig {
       excludeTags: excludeTags,
       includeTags: includeTags,
       fallbackClient: fallbackClient,
+      inferRequiredFromNullable: inferRequiredFromNullable,
     );
   }
 }

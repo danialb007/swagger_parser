@@ -1000,7 +1000,8 @@ data class ClassName(
         },
       );
       const fillController = FillController(
-        config: GeneratorConfig(name: '', outputDirectory: ''),
+        config:
+            GeneratorConfig(name: '', outputDirectory: '', includeIfNull: true),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
       const expectedContents = r'''
@@ -1025,6 +1026,7 @@ class ClassName {
   final int intType;
   final String stringType;
   final bool boolType;
+  @JsonKey(includeIfNull: true)
   final num? nullableType;
   final Haha enumType;
 
@@ -1078,6 +1080,7 @@ class ClassName {
           name: '',
           outputDirectory: '',
           jsonSerializer: JsonSerializer.freezed,
+          includeIfNull: true,
         ),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
@@ -1098,6 +1101,7 @@ class ClassName with _$ClassName {
     String stringType,
     @Default(false)
     bool boolType,
+    @JsonKey(includeIfNull: true)
     @Default(-1.1)
     num? nullableType,
     @Default(Haha.hehe)
@@ -1200,7 +1204,8 @@ data class ClassName(
         },
       );
       const fillController = FillController(
-        config: GeneratorConfig(name: '', outputDirectory: ''),
+        config:
+            GeneratorConfig(name: '', outputDirectory: '', includeIfNull: true),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
       const expectedContents = r'''
@@ -1221,8 +1226,10 @@ class ClassName {
   
   factory ClassName.fromJson(Map<String, Object?> json) => _$ClassNameFromJson(json);
   
+  @JsonKey(includeIfNull: false)
   final int? intType;
   final List<String>? list;
+  @JsonKey(includeIfNull: false)
   final Another? another;
   final List<List<Another>> anotherList;
 
@@ -1269,6 +1276,7 @@ class ClassName {
           name: '',
           outputDirectory: '',
           jsonSerializer: JsonSerializer.freezed,
+          includeIfNull: true,
         ),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
@@ -1284,8 +1292,10 @@ part 'class_name.g.dart';
 class ClassName with _$ClassName {
   const factory ClassName({
     required List<List<Another>> anotherList,
+    @JsonKey(includeIfNull: false)
     int? intType,
     List<String>? list,
+    @JsonKey(includeIfNull: false)
     Another? another,
   }) = _ClassName;
   
@@ -1380,7 +1390,8 @@ data class ClassName(
         },
       );
       const fillController = FillController(
-        config: GeneratorConfig(name: '', outputDirectory: ''),
+        config:
+            GeneratorConfig(name: '', outputDirectory: '', includeIfNull: true),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
       const expectedContents = r'''
@@ -1401,8 +1412,10 @@ class ClassName {
   
   factory ClassName.fromJson(Map<String, Object?> json) => _$ClassNameFromJson(json);
   
+  @JsonKey(includeIfNull: false)
   final int? intNotRequired;
   final int intRequired;
+  @JsonKey(includeIfNull: false)
   final Another? anotherNotRequired;
   final List<Another> list;
 
@@ -1444,6 +1457,7 @@ class ClassName {
           name: '',
           outputDirectory: '',
           jsonSerializer: JsonSerializer.freezed,
+          includeIfNull: true,
         ),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
@@ -1460,7 +1474,9 @@ class ClassName with _$ClassName {
   const factory ClassName({
     required int intRequired,
     required List<Another> list,
+    @JsonKey(includeIfNull: false)
     int? intNotRequired,
+    @JsonKey(includeIfNull: false)
     Another? anotherNotRequired,
   }) = _ClassName;
   
@@ -1651,7 +1667,7 @@ enum EnumName {
   int? toJson() => json;
 
   @override
-  String toString() => json ?? super.toString();
+  String toString() => json?.toString() ?? super.toString();
 }
 ''';
 
@@ -1676,7 +1692,7 @@ enum EnumNameString {
   String? toJson() => json;
 
   @override
-  String toString() => json ?? super.toString();
+  String toString() => json?.toString() ?? super.toString();
 }
 ''';
 
@@ -1829,7 +1845,7 @@ enum EnumName {
   int? toJson() => json;
 
   @override
-  String toString() => json ?? super.toString();
+  String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
   static List<EnumName> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }
@@ -1865,7 +1881,7 @@ enum EnumNameString {
   String? toJson() => json;
 
   @override
-  String toString() => json ?? super.toString();
+  String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
   static List<EnumNameString> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }
@@ -2002,7 +2018,7 @@ enum EnumName {
   final int? json;
 
   @override
-  String toString() => json ?? super.toString();
+  String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
   static List<EnumName> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }
@@ -2052,7 +2068,7 @@ enum EnumName {
   final int? json;
 
   @override
-  String toString() => json ?? super.toString();
+  String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
   static List<EnumName> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }
@@ -2242,7 +2258,8 @@ typealias AnotherValue = Another;
         },
       );
       const fillController = FillController(
-        config: GeneratorConfig(name: '', outputDirectory: ''),
+        config:
+            GeneratorConfig(name: '', outputDirectory: '', includeIfNull: true),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
       const expectedContents = r'''
@@ -2262,10 +2279,14 @@ class ClassName {
   
   factory ClassName.fromJson(Map<String, Object?> json) => _$ClassNameFromJson(json);
   
+  @JsonKey(includeIfNull: false)
   final List<List<List<List<String?>>>>? list1;
+  @JsonKey(includeIfNull: false)
   final String? list2;
   final String list3;
+  @JsonKey(includeIfNull: false)
   final String? list4;
+  @JsonKey(includeIfNull: true)
   final String? list5;
 
   Map<String, Object?> toJson() => _$ClassNameToJson(this);
@@ -2313,6 +2334,7 @@ class ClassName {
           name: '',
           outputDirectory: '',
           jsonSerializer: JsonSerializer.freezed,
+          includeIfNull: true,
         ),
       );
       final filledContent = fillController.fillDtoContent(dataClass);
@@ -2326,9 +2348,13 @@ part 'class_name.g.dart';
 class ClassName with _$ClassName {
   const factory ClassName({
     required String list3,
+    @JsonKey(includeIfNull: true)
     required String? list5,
+    @JsonKey(includeIfNull: false)
     List<List<List<List<String?>>>>? list1,
+    @JsonKey(includeIfNull: false)
     String? list2,
+    @JsonKey(includeIfNull: false)
     String? list4,
   }) = _ClassName;
   
@@ -2666,6 +2692,261 @@ data class ClassName(
 )
 ''';
       expect(filledContent.content, expectedContent);
+    });
+  });
+
+  group('Union types', () {
+    UniversalComponentClass buildUnionDataClass() => UniversalComponentClass(
+          name: 'AnimalUnion',
+          imports: const {'cat', 'dog'},
+          parameters: const {},
+          undiscriminatedUnionVariants: {
+            'Cat': {
+              const UniversalType(
+                type: 'int',
+                name: 'mewCount',
+                isRequired: true,
+              ),
+            },
+            'Dog': {
+              const UniversalType(
+                type: 'String',
+                name: 'barkSound',
+                isRequired: true,
+              ),
+            },
+          },
+        );
+
+    test('dart_mappable unions use sealed naming', () {
+      const controller = FillController(
+        config: GeneratorConfig(
+          name: '',
+          outputDirectory: '',
+          jsonSerializer: JsonSerializer.dartMappable,
+        ),
+      );
+
+      final generated = controller.fillDtoContent(buildUnionDataClass());
+
+      expect(generated.name, 'models/animal_sealed.dart');
+
+      const expectedContents = r'''
+import 'package:dart_mappable/dart_mappable.dart';
+
+import 'cat.dart';
+import 'dog.dart';
+import 'cat.dart';
+import 'dog.dart';
+
+part 'animal_sealed.mapper.dart';
+
+@MappableClass(includeSubClasses: [AnimalSealedCat, AnimalSealedDog])
+sealed class AnimalSealed with AnimalSealedMappable {
+  const AnimalSealed();
+
+  @Deprecated('Use Dart pattern matching with sealed class')
+  T when<T>({
+    required T Function(AnimalSealedCat cat) cat,
+    required T Function(AnimalSealedDog dog) dog,
+  }) {
+    return maybeWhen(
+      cat: cat,
+      dog: dog,
+    )!;
+  }
+
+  @Deprecated('Use Dart pattern matching with sealed class')
+  T? maybeWhen<T>({
+    T Function(AnimalSealedCat cat)? cat,
+    T Function(AnimalSealedDog dog)? dog,
+  }) {
+    return switch (this) {
+      AnimalSealedCat _ => cat?.call(this as AnimalSealedCat),
+      AnimalSealedDog _ => dog?.call(this as AnimalSealedDog),
+      _ => throw Exception("Unhandled type: ${this.runtimeType}"),
+    };
+  }
+
+  static AnimalSealed fromJson(Map<String, dynamic> json) {
+    return AnimalSealedDeserializer.tryDeserialize(json);
+  }
+
+}
+
+extension AnimalSealedDeserializer on AnimalSealed {
+  static AnimalSealed tryDeserialize(Map<String, dynamic> json) {
+    try {
+      return AnimalSealedCatMapper.ensureInitialized().decodeMap<AnimalSealedCat>(json);
+    } catch (_) {}
+    try {
+      return AnimalSealedDogMapper.ensureInitialized().decodeMap<AnimalSealedDog>(json);
+    } catch (_) {}
+
+
+    throw FormatException('Could not determine the correct type for AnimalSealed from: $json');
+  }
+}
+
+@MappableClass()
+class AnimalSealedCat extends AnimalSealed with AnimalSealedCatMappable implements Cat {
+  @override
+  final int mewCount;
+
+  const AnimalSealedCat({
+    required this.mewCount,
+  });
+}
+
+@MappableClass()
+class AnimalSealedDog extends AnimalSealed with AnimalSealedDogMappable implements Dog {
+  @override
+  final String barkSound;
+
+  const AnimalSealedDog({
+    required this.barkSound,
+  });
+}
+''';
+      expect(generated.content, expectedContents);
+    });
+
+    test('json_serializable unions use sealed naming', () {
+      const controller = FillController(
+        config: GeneratorConfig(
+          name: '',
+          outputDirectory: '',
+        ),
+      );
+
+      final generated = controller.fillDtoContent(buildUnionDataClass());
+
+      expect(generated.name, 'models/animal_sealed.dart');
+
+      const expectedContents = r'''
+import 'package:json_annotation/json_annotation.dart';
+
+import 'cat.dart';
+import 'dog.dart';
+import 'cat.dart';
+import 'dog.dart';
+
+
+part 'animal_sealed.g.dart';
+
+@JsonSerializable(createFactory: false)
+sealed class AnimalSealed {
+  const AnimalSealed();
+  
+  factory AnimalSealed.fromJson(Map<String, dynamic> json) =>
+      AnimalSealedDeserializer.tryDeserialize(json);
+  
+  Map<String, dynamic> toJson();
+}
+
+extension AnimalSealedDeserializer on AnimalSealed {
+  static AnimalSealed tryDeserialize(Map<String, dynamic> json) {
+    try {
+      return AnimalSealedCat.fromJson(json);
+    } catch (_) {}
+    try {
+      return AnimalSealedDog.fromJson(json);
+    } catch (_) {}
+
+
+    throw FormatException('Could not determine the correct type for AnimalSealed from: $json');
+  }
+}
+
+@JsonSerializable()
+class AnimalSealedCat extends AnimalSealed implements Cat {
+  @override
+  final int mewCount;
+
+  const AnimalSealedCat({
+    required this.mewCount,
+  });
+  
+  factory AnimalSealedCat.fromJson(Map<String, dynamic> json) =>
+      _$AnimalSealedCatFromJson(json);
+      
+  @override
+  Map<String, dynamic> toJson() => _$AnimalSealedCatToJson(this);
+}
+@JsonSerializable()
+class AnimalSealedDog extends AnimalSealed implements Dog {
+  @override
+  final String barkSound;
+
+  const AnimalSealedDog({
+    required this.barkSound,
+  });
+  
+  factory AnimalSealedDog.fromJson(Map<String, dynamic> json) =>
+      _$AnimalSealedDogFromJson(json);
+      
+  @override
+  Map<String, dynamic> toJson() => _$AnimalSealedDogToJson(this);
+}
+''';
+      expect(generated.content, expectedContents);
+    });
+
+    test('freezed discriminated union with keyword factory names', () {
+      final dataClass = UniversalComponentClass(
+        name: 'DeviceTypeConfig',
+        imports: const {},
+        parameters: const {},
+        discriminator: (
+          propertyName: 'deviceType',
+          discriminatorValueToRefMapping: const {
+            'DEFAULT': '#/components/schemas/DefaultConfig',
+            'CUSTOM': '#/components/schemas/CustomConfig',
+          },
+          refProperties: {
+            '#/components/schemas/DefaultConfig': const {},
+            '#/components/schemas/CustomConfig': {
+              const UniversalType(
+                type: 'string',
+                name: 'configValue',
+                isRequired: true,
+              ),
+            },
+          },
+        ),
+      );
+
+      const controller = FillController(
+        config: GeneratorConfig(
+          name: '',
+          outputDirectory: '',
+          jsonSerializer: JsonSerializer.freezed,
+        ),
+      );
+
+      final generated = controller.fillDtoContent(dataClass);
+
+      const expectedContents = r'''
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'device_type_config.freezed.dart';
+part 'device_type_config.g.dart';
+
+@Freezed(unionKey: 'deviceType')
+sealed class DeviceTypeConfig with _$DeviceTypeConfig {
+  @FreezedUnionValue('DEFAULT')
+  const factory DeviceTypeConfig.defaultValue() = DeviceTypeConfigDefault;
+
+  @FreezedUnionValue('CUSTOM')
+  const factory DeviceTypeConfig.custom({
+    required String configValue,
+  }) = DeviceTypeConfigCustom;
+
+  
+  factory DeviceTypeConfig.fromJson(Map<String, Object?> json) => _$DeviceTypeConfigFromJson(json);
+}
+''';
+      expect(generated.content, expectedContents);
     });
   });
 }
